@@ -1,0 +1,8 @@
+[schema]
+url = "http://localhost:8000"
+lang = "Rust"
+orm = "Diesel"
+root = "src/models"
+
+[tables]
+names = ["user", "token"]
