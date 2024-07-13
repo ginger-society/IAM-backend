@@ -11,6 +11,7 @@ use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig};
 use rocket_prometheus::PrometheusMetrics;
 use std::env;
 use std::process::{exit, Command};
+use std::sync::atomic::AtomicUsize;
 mod db;
 mod errors;
 mod fairings;
@@ -29,7 +30,14 @@ fn rocket() -> Rocket<Build> {
         .attach(prometheus.clone())
         .mount(
             "/",
-            openapi_get_routes![routes::index, identity::register, identity::login],
+            openapi_get_routes![
+                routes::index,
+                identity::register,
+                identity::login,
+                identity::refresh_token,
+                identity::validate_token,
+                identity::change_password
+            ],
         )
         .mount(
             "/api-docs",

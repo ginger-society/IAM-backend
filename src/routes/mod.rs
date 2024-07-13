@@ -10,7 +10,7 @@ use rocket_okapi::openapi;
 pub mod identity;
 
 /// This is a description. <br />You can do simple html <br /> like <b>this<b/>
-#[openapi(tag = "Healthcheck")]
+#[openapi()]
 #[get("/")]
 pub fn index(
     rdb: &State<r2d2::Pool<ConnectionManager<PgConnection>>>,
