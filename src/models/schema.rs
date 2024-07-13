@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
-
+use diesel::Insertable;
 use chrono::NaiveDate;
 use diesel::{deserialize::Queryable, table, Selectable};
 use schemars::JsonSchema;
@@ -17,17 +17,19 @@ pub mod schema {
     table! {
         user (id) {
             #[max_length = 40]
-            first_name ->Varchar,
+            first_name ->Nullable<Varchar>,
             #[max_length = 40]
-            last_name ->Varchar,
+            last_name ->Nullable<Varchar>,
             #[max_length = 40]
             middle_name ->Nullable<Varchar>,
             #[max_length = 100]
             email_id ->Varchar,
             #[max_length = 15]
-            mobile_number ->Varchar,
+            mobile_number ->Nullable<Varchar>,
             created_at ->Timestamptz,
             updated_at ->Timestamptz,
+            #[max_length = 200]
+            password_hash ->Nullable<Varchar>,
             id ->BigInt,
             
         }
@@ -35,10 +37,8 @@ pub mod schema {
     
     table! {
         token (id) {
-            #[max_length = 100]
-            password_hash ->Varchar,
-            #[max_length = 100]
-            session_hash ->Varchar,
+            #[max_length = 200]
+            session_hash ->Nullable<Varchar>,
             user_id ->BigInt,
             id ->BigInt,
             
@@ -67,13 +67,14 @@ use schema::{ user,token, };
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = user)]
 pub struct User {
-    pub first_name:String,
-    pub last_name:String,
+    pub first_name:Option<String>,
+    pub last_name:Option<String>,
     pub middle_name:Option<String>,
     pub email_id:String,
-    pub mobile_number:String,
+    pub mobile_number:Option<String>,
     pub created_at:DateTime<Utc>,
     pub updated_at:DateTime<Utc>,
+    pub password_hash:Option<String>,
     pub id:i64,
     
 }
@@ -84,8 +85,7 @@ pub struct User {
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = token)]
 pub struct Token {
-    pub password_hash:String,
-    pub session_hash:String,
+    pub session_hash:Option<String>,
     pub user_id:i64,
     pub id:i64,
     
@@ -94,29 +94,29 @@ pub struct Token {
 
 
 
-#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema)]
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema)]
 
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = user)]
 pub struct UserInsertable {
-    pub first_name:String,
-    pub last_name:String,
+    pub first_name:Option<String>,
+    pub last_name:Option<String>,
     pub middle_name:Option<String>,
     pub email_id:String,
-    pub mobile_number:String,
+    pub mobile_number:Option<String>,
     pub created_at:DateTime<Utc>,
     pub updated_at:DateTime<Utc>,
+    pub password_hash:Option<String>,
     
 }
 
 
-#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Associations)]
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema,Associations)]
 #[diesel(belongs_to(User, foreign_key = user_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = token)]
 pub struct TokenInsertable {
-    pub password_hash:String,
-    pub session_hash:String,
+    pub session_hash:Option<String>,
     pub user_id:i64,
     
 }

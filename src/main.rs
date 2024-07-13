@@ -2,6 +2,7 @@
 extern crate rocket;
 use rocket::Rocket;
 
+use crate::routes::identity;
 use db::redis::create_redis_pool;
 use dotenv::dotenv;
 use rocket::Build;
@@ -10,7 +11,6 @@ use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig};
 use rocket_prometheus::PrometheusMetrics;
 use std::env;
 use std::process::{exit, Command};
-
 mod db;
 mod errors;
 mod fairings;
@@ -20,20 +20,6 @@ mod routes;
 
 #[launch]
 fn rocket() -> Rocket<Build> {
-    // Call the `db-compose render --skip` command
-    let output = Command::new("db-compose")
-        .arg("render")
-        .arg("--skip")
-        .output()
-        .expect("Failed to execute `db-compose render --skip`");
-
-    if !output.status.success() {
-        eprintln!("Error: {}", String::from_utf8_lossy(&output.stderr));
-        exit(1);
-    } else {
-        println!("Output: {}", String::from_utf8_lossy(&output.stdout));
-    }
-
     dotenv().ok();
     let prometheus = PrometheusMetrics::new();
 
@@ -41,7 +27,10 @@ fn rocket() -> Rocket<Build> {
         .manage(db::connect_rdb())
         .attach(fairings::cors::CORS)
         .attach(prometheus.clone())
-        .mount("/", openapi_get_routes![routes::index,])
+        .mount(
+            "/",
+            openapi_get_routes![routes::index, identity::register, identity::login],
+        )
         .mount(
             "/api-docs",
             make_swagger_ui(&SwaggerUIConfig {
