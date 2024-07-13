@@ -30,6 +30,6 @@ pub fn protected_route(
     claims: Claims,
 ) -> Json<MessageResponse> {
     Json(MessageResponse {
-        message: format!("Hello, {}! This is a protected route.", claims.sub),
+        message: format!("Hello, {}! This is a protected route.", claims.user_id),
     })
 }

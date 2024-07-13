@@ -240,6 +240,7 @@ pub fn login(
 pub fn refresh_token(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     refresh_request: Json<RefreshTokenRequest>,
+    claims: Claims,
 ) -> Json<RefreshTokenResponse> {
     use crate::models::schema::schema::token::dsl::*;
 
@@ -296,30 +297,16 @@ pub fn refresh_token(
     Json(RefreshTokenResponse { access_token })
 }
 #[openapi()]
-#[get("/validate?<access_token>")]
-pub fn validate_token(
-    access_token: String,
-) -> Result<Json<ValidateTokenResponse>, rocket::http::Status> {
-    let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    let decoding_key = DecodingKey::from_secret(secret.as_ref());
-
-    let token_data = match decode::<Claims>(
-        &access_token,
-        &decoding_key,
-        &Validation::new(Algorithm::HS256),
-    ) {
-        Ok(data) => data,
-        Err(_) => return Err(rocket::http::Status::Unauthorized),
-    };
-
+#[get("/validate")]
+pub fn validate_token(claims: Claims) -> Result<Json<ValidateTokenResponse>, rocket::http::Status> {
     Ok(Json(ValidateTokenResponse {
-        sub: token_data.claims.sub,
-        exp: token_data.claims.exp,
-        user_id: token_data.claims.user_id,
-        first_name: token_data.claims.first_name,
-        last_name: token_data.claims.last_name,
-        middle_name: token_data.claims.middle_name,
-        client_id: token_data.claims.client_id,
+        sub: claims.sub,
+        exp: claims.exp,
+        user_id: claims.user_id,
+        first_name: claims.first_name,
+        last_name: claims.last_name,
+        middle_name: claims.middle_name,
+        client_id: claims.client_id,
     }))
 }
 

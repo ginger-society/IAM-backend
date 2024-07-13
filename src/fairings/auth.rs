@@ -1,7 +1,7 @@
 use rocket::{
     fairing::{Fairing, Info, Kind},
     outcome::Outcome,
-    Build, Request, Rocket,
+    Request,
 };
 
 use crate::middlewares::jwt::Claims;
