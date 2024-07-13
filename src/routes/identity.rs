@@ -1,6 +1,5 @@
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
-use diesel::associations::HasTable;
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{insert_into, PgConnection, RunQueryDsl};
 use diesel::{prelude::*, update};
@@ -14,6 +13,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::env;
 
+use crate::middlewares::jwt::Claims;
 use crate::models::schema::{App, Token, TokenInsertable, User, UserInsertable};
 
 #[derive(Deserialize, Serialize, JsonSchema)]
@@ -354,16 +354,4 @@ fn create_jwt(
         &EncodingKey::from_secret(secret.as_ref()),
     )
     .unwrap()
-}
-
-#[derive(Serialize, Deserialize)]
-struct Claims {
-    sub: String,
-    exp: usize,
-    user_id: String,
-    token_type: String, // Add token_type to distinguish between access and refresh tokens
-    first_name: Option<String>,
-    last_name: Option<String>,
-    middle_name: Option<String>,
-    client_id: String,
 }

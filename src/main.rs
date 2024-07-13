@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate rocket;
+use fairings::auth::AuthFairing;
 use rocket::Rocket;
 
 use crate::routes::identity;
@@ -15,8 +16,8 @@ use std::sync::atomic::AtomicUsize;
 mod db;
 mod errors;
 mod fairings;
+mod middlewares;
 mod models;
-mod request_guards;
 mod routes;
 
 #[launch]
@@ -28,6 +29,7 @@ fn rocket() -> Rocket<Build> {
         .manage(db::connect_rdb())
         .attach(fairings::cors::CORS)
         .attach(prometheus.clone())
+        .attach(AuthFairing)
         .mount(
             "/",
             openapi_get_routes![
@@ -36,7 +38,8 @@ fn rocket() -> Rocket<Build> {
                 identity::login,
                 identity::refresh_token,
                 identity::validate_token,
-                identity::change_password
+                identity::change_password,
+                routes::protected_route
             ],
         )
         .mount(

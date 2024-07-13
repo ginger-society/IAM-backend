@@ -1,3 +1,4 @@
+use crate::middlewares::jwt::Claims;
 use crate::models::response::MessageResponse;
 use diesel::r2d2;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -18,5 +19,17 @@ pub fn index(
 ) -> Json<MessageResponse> {
     Json(MessageResponse {
         message: "Ok".to_string(),
+    })
+}
+
+#[openapi()]
+#[get("/protected")]
+pub fn protected_route(
+    rdb: &State<r2d2::Pool<ConnectionManager<PgConnection>>>,
+    cache: &State<Pool<RedisConnectionManager>>,
+    claims: Claims,
+) -> Json<MessageResponse> {
+    Json(MessageResponse {
+        message: format!("Hello, {}! This is a protected route.", claims.sub),
     })
 }
