@@ -40,7 +40,8 @@ fn rocket() -> Rocket<Build> {
                 identity::validate_token,
                 identity::change_password,
                 routes::protected_route,
-                identity::update_profile
+                identity::update_profile,
+                identity::get_app_by_client_id
             ],
         )
         .mount(

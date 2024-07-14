@@ -53,6 +53,8 @@ pub mod schema {
             client_id ->Varchar,
             #[max_length = 50]
             name ->Varchar,
+            #[max_length = 200]
+            logo_url ->Nullable<Varchar>,
             id ->BigInt,
             
         }
@@ -154,6 +156,7 @@ pub struct Token {
 pub struct App {
     pub client_id:String,
     pub name:String,
+    pub logo_url:Option<String>,
     pub id:i64,
     
 }
@@ -234,6 +237,7 @@ pub struct TokenInsertable {
 pub struct AppInsertable {
     pub client_id:String,
     pub name:String,
+    pub logo_url:Option<String>,
     
 }
 

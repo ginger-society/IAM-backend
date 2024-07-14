@@ -16,6 +16,12 @@ use std::env;
 use crate::middlewares::jwt::Claims;
 use crate::models::schema::{App, Token, TokenInsertable, User, UserInsertable};
 
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct AppResponse {
+    name: String,
+    logo_url: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct UpdateProfileRequest {
     first_name: Option<String>,
@@ -357,7 +363,7 @@ fn create_jwt(
     .unwrap()
 }
 
-#[openapi]
+#[openapi()]
 #[put("/update-profile", data = "<update_request>")]
 pub fn update_profile(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
@@ -386,5 +392,29 @@ pub fn update_profile(
         }))
     } else {
         Err(Status::NotFound)
+    }
+}
+
+#[openapi]
+#[get("/app-details/<client_id_>")]
+pub fn get_app_by_client_id(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    client_id_: String,
+) -> Result<Json<AppResponse>, rocket::http::Status> {
+    use crate::models::schema::schema::app::dsl::*;
+
+    let mut conn = rdb
+        .get()
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    match app
+        .filter(client_id.eq(&client_id_))
+        .first::<App>(&mut conn)
+    {
+        Ok(a) => Ok(Json(AppResponse {
+            name: a.name,
+            logo_url: a.logo_url,
+        })),
+        Err(_) => Err(rocket::http::Status::NotFound),
     }
 }
