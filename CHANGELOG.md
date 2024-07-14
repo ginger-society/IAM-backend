@@ -1,5 +1,11 @@
+## 0.4.0-nightly.0 - 2024-07-14
+feat:
+ - [1cc8d1e9fd](1cc8d1e9fd1cde041f68c69169729d6178d415bb) (Ginger Society Admin) feat: updated readme and added is_root column in User table
+	
 ## 0.3.0-nightly.0 - 2024-07-14
 chore:
+ - [e1b32e95fb](e1b32e95fb06ac9dd7b8f3558992de08b614f2ce) (Ginger Society Admin) chore: version bump to 0.3.0-nightly.0
+	
  - [82e1108250](82e11082509e27f7c60d80a5d1ad7c2b0327dba5) (Ginger Society Admin) chore: updated project details
 	
 ## 0.2.0-nightly.0 - 2024-07-14
