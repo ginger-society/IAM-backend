@@ -75,13 +75,32 @@ pub mod schema {
         }
     }
 
+    table! {
+        group_owners (id) {
+            id ->Int8,
+            user_id ->Int8,
+            group_id ->Int8,
+
+        }
+    }
+
     diesel::joinable!(token -> user (user_id));
     diesel::joinable!(token -> app (app_id));
 
-    diesel::allow_tables_to_appear_in_same_query!(user, token, app, group, group_users,);
+    diesel::joinable!(group_users -> user (user_id));
+    diesel::joinable!(group_owners -> user (user_id));
+
+    diesel::allow_tables_to_appear_in_same_query!(
+        user,
+        token,
+        app,
+        group,
+        group_users,
+        group_owners,
+    );
 }
 
-use schema::{app, group, group_users, token, user};
+use schema::{app, group, group_owners, group_users, token, user};
 
 #[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema, Identifiable)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
@@ -136,7 +155,20 @@ pub struct Group {
 #[diesel(belongs_to(Group, foreign_key = group_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = group_users)]
-pub struct Group_User {
+pub struct Group_Users {
+    pub id: i64,
+    pub user_id: i64,
+    pub group_id: i64,
+}
+
+#[derive(
+    Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema, Identifiable, Associations,
+)]
+#[diesel(belongs_to(User, foreign_key = user_id))]
+#[diesel(belongs_to(Group, foreign_key = group_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(table_name = group_owners)]
+pub struct Group_Owners {
     pub id: i64,
     pub user_id: i64,
     pub group_id: i64,
@@ -191,7 +223,19 @@ pub struct GroupInsertable {
 #[diesel(belongs_to(Group, foreign_key = group_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = group_users)]
-pub struct Group_UserInsertable {
+pub struct Group_UsersInsertable {
+    pub user_id: i64,
+    pub group_id: i64,
+}
+
+#[derive(
+    Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema, Associations,
+)]
+#[diesel(belongs_to(User, foreign_key = user_id))]
+#[diesel(belongs_to(Group, foreign_key = group_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(table_name = group_owners)]
+pub struct Group_OwnersInsertable {
     pub user_id: i64,
     pub group_id: i64,
 }
