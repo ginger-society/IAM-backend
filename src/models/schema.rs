@@ -1,15 +1,15 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
-use chrono::offset::Utc;
-use chrono::DateTime;
-use chrono::NaiveDate;
-use diesel::Associations;
-use diesel::Identifiable;
 use diesel::Insertable;
-use diesel::{deserialize::Queryable, Selectable};
-use rocket::serde::Deserialize;
+use chrono::NaiveDate;
+use diesel::{deserialize::Queryable, table, Selectable};
 use schemars::JsonSchema;
 use serde::Serialize;
+use chrono::offset::Utc;
+use chrono::DateTime;
+use diesel::Identifiable;
+use diesel::Associations;
+use rocket::serde::Deserialize;
 
 pub mod schema {
     use diesel::table;
@@ -30,11 +30,12 @@ pub mod schema {
             updated_at ->Timestamptz,
             #[max_length = 400]
             password_hash ->Nullable<Varchar>,
+            is_root ->Bool,
             id ->BigInt,
-
+            
         }
     }
-
+    
     table! {
         token (id) {
             #[max_length = 400]
@@ -42,10 +43,10 @@ pub mod schema {
             user_id ->BigInt,
             app_id ->BigInt,
             id ->BigInt,
-
+            
         }
     }
-
+    
     table! {
         app (id) {
             #[max_length = 150]
@@ -53,42 +54,51 @@ pub mod schema {
             #[max_length = 50]
             name ->Varchar,
             id ->BigInt,
-
+            
         }
     }
-
+    
     table! {
         group (id) {
             #[max_length = 50]
             identifier ->Varchar,
+            disabled ->Bool,
             id ->BigInt,
-
+            
         }
     }
-
+    
     table! {
         group_users (id) {
             id ->Int8,
             user_id ->Int8,
             group_id ->Int8,
-
+            
         }
     }
-
+    
     table! {
         group_owners (id) {
             id ->Int8,
             user_id ->Int8,
             group_id ->Int8,
-
+            
         }
     }
-
-    diesel::joinable!(token -> user (user_id));
-    diesel::joinable!(token -> app (app_id));
-
-    diesel::joinable!(group_users -> user (user_id));
-    diesel::joinable!(group_owners -> user (user_id));
+    
+    
+        
+    
+        diesel::joinable!(token -> user (user_id));diesel::joinable!(token -> app (app_id));
+    
+        
+    
+        diesel::joinable!(group_users -> user (user_id));diesel::joinable!(group_owners -> user (user_id));
+    
+        
+    
+        
+    
 
     diesel::allow_tables_to_appear_in_same_query!(
         user,
@@ -97,145 +107,165 @@ pub mod schema {
         group,
         group_users,
         group_owners,
+        
     );
 }
 
-use schema::{app, group, group_owners, group_users, token, user};
+use schema::{ user,token,app,group,group_users,group_owners, };
 
-#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema, Identifiable)]
+
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable)]
+
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = user)]
 pub struct User {
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
-    pub middle_name: Option<String>,
-    pub email_id: String,
-    pub mobile_number: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub password_hash: Option<String>,
-    pub id: i64,
+    pub first_name:Option<String>,
+    pub last_name:Option<String>,
+    pub middle_name:Option<String>,
+    pub email_id:String,
+    pub mobile_number:Option<String>,
+    pub created_at:DateTime<Utc>,
+    pub updated_at:DateTime<Utc>,
+    pub password_hash:Option<String>,
+    pub is_root:bool,
+    pub id:i64,
+    
 }
 
-#[derive(
-    Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema, Identifiable, Associations,
-)]
-#[diesel(belongs_to(User, foreign_key = user_id))]
-#[diesel(belongs_to(App, foreign_key = app_id))]
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable,Associations)]
+#[diesel(belongs_to(User, foreign_key = user_id))]#[diesel(belongs_to(App, foreign_key = app_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = token)]
 pub struct Token {
-    pub session_hash: Option<String>,
-    pub user_id: i64,
-    pub app_id: i64,
-    pub id: i64,
+    pub session_hash:Option<String>,
+    pub user_id:i64,
+    pub app_id:i64,
+    pub id:i64,
+    
 }
 
-#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema, Identifiable)]
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable)]
+
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = app)]
 pub struct App {
-    pub client_id: String,
-    pub name: String,
-    pub id: i64,
+    pub client_id:String,
+    pub name:String,
+    pub id:i64,
+    
 }
 
-#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema, Identifiable)]
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable)]
+
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = group)]
 pub struct Group {
-    pub identifier: String,
-    pub id: i64,
+    pub identifier:String,
+    pub disabled:bool,
+    pub id:i64,
+    
 }
 
-#[derive(
-    Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema, Identifiable, Associations,
-)]
-#[diesel(belongs_to(User, foreign_key = user_id))]
-#[diesel(belongs_to(Group, foreign_key = group_id))]
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable,Associations)]
+#[diesel(belongs_to(User, foreign_key = user_id))]#[diesel(belongs_to(Group, foreign_key = group_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = group_users)]
 pub struct Group_Users {
-    pub id: i64,
-    pub user_id: i64,
-    pub group_id: i64,
+    pub id:i64,
+    pub user_id:i64,
+    pub group_id:i64,
+    
 }
 
-#[derive(
-    Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema, Identifiable, Associations,
-)]
-#[diesel(belongs_to(User, foreign_key = user_id))]
-#[diesel(belongs_to(Group, foreign_key = group_id))]
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable,Associations)]
+#[diesel(belongs_to(User, foreign_key = user_id))]#[diesel(belongs_to(Group, foreign_key = group_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = group_owners)]
 pub struct Group_Owners {
-    pub id: i64,
-    pub user_id: i64,
-    pub group_id: i64,
+    pub id:i64,
+    pub user_id:i64,
+    pub group_id:i64,
+    
 }
 
+
+
+
 #[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema)]
+
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = user)]
 pub struct UserInsertable {
-    pub first_name: Option<String>,
-    pub last_name: Option<String>,
-    pub middle_name: Option<String>,
-    pub email_id: String,
-    pub mobile_number: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub password_hash: Option<String>,
+    pub first_name:Option<String>,
+    pub last_name:Option<String>,
+    pub middle_name:Option<String>,
+    pub email_id:String,
+    pub mobile_number:Option<String>,
+    pub created_at:DateTime<Utc>,
+    pub updated_at:DateTime<Utc>,
+    pub password_hash:Option<String>,
+    pub is_root:bool,
+    
 }
 
-#[derive(
-    Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema, Associations,
-)]
-#[diesel(belongs_to(User, foreign_key = user_id))]
-#[diesel(belongs_to(App, foreign_key = app_id))]
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema,Associations)]
+#[diesel(belongs_to(User, foreign_key = user_id))]#[diesel(belongs_to(App, foreign_key = app_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = token)]
 pub struct TokenInsertable {
-    pub session_hash: Option<String>,
-    pub user_id: i64,
-    pub app_id: i64,
+    pub session_hash:Option<String>,
+    pub user_id:i64,
+    pub app_id:i64,
+    
 }
 
+
 #[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema)]
+
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = app)]
 pub struct AppInsertable {
-    pub client_id: String,
-    pub name: String,
+    pub client_id:String,
+    pub name:String,
+    
 }
 
+
 #[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema)]
+
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = group)]
 pub struct GroupInsertable {
-    pub identifier: String,
+    pub identifier:String,
+    pub disabled:bool,
+    
 }
 
-#[derive(
-    Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema, Associations,
-)]
-#[diesel(belongs_to(User, foreign_key = user_id))]
-#[diesel(belongs_to(Group, foreign_key = group_id))]
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema,Associations)]
+#[diesel(belongs_to(User, foreign_key = user_id))]#[diesel(belongs_to(Group, foreign_key = group_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = group_users)]
 pub struct Group_UsersInsertable {
-    pub user_id: i64,
-    pub group_id: i64,
+    pub user_id:i64,
+    pub group_id:i64,
+    
 }
 
-#[derive(
-    Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema, Associations,
-)]
-#[diesel(belongs_to(User, foreign_key = user_id))]
-#[diesel(belongs_to(Group, foreign_key = group_id))]
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema,Associations)]
+#[diesel(belongs_to(User, foreign_key = user_id))]#[diesel(belongs_to(Group, foreign_key = group_id))]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 #[diesel(table_name = group_owners)]
 pub struct Group_OwnersInsertable {
-    pub user_id: i64,
-    pub group_id: i64,
+    pub user_id:i64,
+    pub group_id:i64,
+    
 }

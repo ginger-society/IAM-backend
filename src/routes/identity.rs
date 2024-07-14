@@ -172,6 +172,7 @@ pub fn register(
         created_at: Utc::now(),
         updated_at: Utc::now(),
         password_hash: Some(hashed_password.clone()),
+        is_root: false,
     };
 
     insert_into(user)

@@ -23,6 +23,8 @@ IAM is a comprehensive Identity and Access Management system implemented in Rust
 cargo run
 ```
 
+You will be needing a DB for this , you can use https://github.com/ginger-society/IAM-db
+
 ### Release Mode
 
 ```bash
@@ -51,3 +53,5 @@ cargo test
   - `users`: Stores user information including hashed passwords.
   - `tokens`: Manages authentication tokens for session management.
   - Additional tables for group memberships and permissions (if applicable).
+
+
