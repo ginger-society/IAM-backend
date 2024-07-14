@@ -1,3 +1,11 @@
+## 0.3.0-nightly.0 - 2024-07-14
+chore:
+ - [82e1108250](82e11082509e27f7c60d80a5d1ad7c2b0327dba5) (Ginger Society Admin) chore: updated project details
+	
+## 0.2.0-nightly.0 - 2024-07-14
+chore:
+ - [f294c0c32f](f294c0c32f3e62218730e04075690469e4ad739b) (Ginger Society Admin) chore: version bump to 0.2.0-nightly.0
+	
 ## 0.1.0-nightly.0 - 2024-07-14
 chore:
  - [7c4c81c842](7c4c81c842dd0d564da2da2d85ada1147cf7d569) (Ginger Society Admin) chore: version bump to 0.1.0-nightly.0
