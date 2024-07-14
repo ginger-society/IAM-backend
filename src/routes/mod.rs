@@ -1,4 +1,4 @@
-use crate::middlewares::groups::Groups;
+use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::jwt::Claims;
 use crate::models::response::MessageResponse;
 use diesel::r2d2;
@@ -29,7 +29,7 @@ pub fn protected_route(
     rdb: &State<r2d2::Pool<ConnectionManager<PgConnection>>>,
     cache: &State<Pool<RedisConnectionManager>>,
     claims: Claims,
-    groups: Groups,
+    groups: GroupMemberships,
 ) -> Json<MessageResponse> {
     Json(MessageResponse {
         message: format!(
