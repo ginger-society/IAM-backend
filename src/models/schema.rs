@@ -6,7 +6,7 @@ use chrono::NaiveDate;
 use diesel::Associations;
 use diesel::Identifiable;
 use diesel::Insertable;
-use diesel::{deserialize::Queryable, table, Selectable};
+use diesel::{deserialize::Queryable, Selectable};
 use rocket::serde::Deserialize;
 use schemars::JsonSchema;
 use serde::Serialize;

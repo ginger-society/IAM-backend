@@ -16,6 +16,19 @@ use std::env;
 use crate::middlewares::jwt::Claims;
 use crate::models::schema::{App, Token, TokenInsertable, User, UserInsertable};
 
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct UpdateProfileRequest {
+    first_name: Option<String>,
+    middle_name: Option<String>,
+    last_name: Option<String>,
+    mobile_number: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct UpdateProfileResponse {
+    message: String,
+}
+
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct RefreshTokenRequest {
     refresh_token: String,
@@ -341,4 +354,36 @@ fn create_jwt(
         &EncodingKey::from_secret(secret.as_ref()),
     )
     .unwrap()
+}
+
+#[openapi]
+#[put("/update-profile", data = "<update_request>")]
+pub fn update_profile(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    claims: Claims,
+    update_request: Json<UpdateProfileRequest>,
+) -> Result<Json<UpdateProfileResponse>, Status> {
+    let mut conn = rdb.get().map_err(|_| Status::ServiceUnavailable)?;
+
+    use crate::models::schema::schema::user::dsl::*;
+
+    let user_id = claims.user_id.parse::<i64>().unwrap();
+
+    let updated_rows = diesel::update(user.filter(id.eq(user_id)))
+        .set((
+            first_name.eq(&update_request.first_name),
+            middle_name.eq(&update_request.middle_name),
+            last_name.eq(&update_request.last_name),
+            mobile_number.eq(&update_request.mobile_number),
+        ))
+        .execute(&mut conn)
+        .map_err(|_| Status::InternalServerError)?;
+
+    if updated_rows > 0 {
+        Ok(Json(UpdateProfileResponse {
+            message: "Profile updated successfully".to_string(),
+        }))
+    } else {
+        Err(Status::NotFound)
+    }
 }
