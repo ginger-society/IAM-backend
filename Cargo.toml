@@ -5,7 +5,7 @@ license = "MIT"
 name = "IAM"
 readme = "README.md"
 repository = "https://github.com/ginger-society/template-backend-rust"
-version = "0.5.0-nightly.0"
+version = "0.1.0-nightly.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
