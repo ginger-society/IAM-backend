@@ -13,6 +13,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::env;
 
+use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::jwt::Claims;
 use crate::models::schema::{App, Token, TokenInsertable, User, UserInsertable};
 
@@ -417,4 +418,14 @@ pub fn get_app_by_client_id(
         })),
         Err(_) => Err(rocket::http::Status::NotFound),
     }
+}
+
+#[openapi]
+#[get("/group-memberships")]
+pub fn get_group_memberships(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    claims: Claims,
+    groups: GroupMemberships,
+) -> Result<Json<Vec<String>>, rocket::http::Status> {
+    Ok(Json(groups.0))
 }

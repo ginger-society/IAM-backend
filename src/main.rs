@@ -11,8 +11,6 @@ use rocket_okapi::openapi_get_routes;
 use rocket_okapi::swagger_ui::{make_swagger_ui, SwaggerUIConfig};
 use rocket_prometheus::PrometheusMetrics;
 use std::env;
-use std::process::{exit, Command};
-use std::sync::atomic::AtomicUsize;
 mod db;
 mod errors;
 mod fairings;
@@ -41,7 +39,8 @@ fn rocket() -> Rocket<Build> {
                 identity::change_password,
                 routes::protected_route,
                 identity::update_profile,
-                identity::get_app_by_client_id
+                identity::get_app_by_client_id,
+                identity::get_group_memberships
             ],
         )
         .mount(

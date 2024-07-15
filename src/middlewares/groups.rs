@@ -14,7 +14,7 @@ use rocket_okapi::OpenApiError;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct GroupMemberships(Vec<String>);
+pub struct GroupMemberships(pub Vec<String>);
 
 impl GroupMemberships {
     pub fn new(groups: Vec<String>) -> Self {
