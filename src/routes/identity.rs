@@ -4,6 +4,9 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{insert_into, PgConnection, RunQueryDsl};
 use diesel::{prelude::*, update};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use r2d2_redis::redis::Commands;
+use r2d2_redis::RedisConnectionManager;
+use rand::Rng;
 use rocket::http::Status;
 use rocket::response::status;
 use rocket::serde::json::Json;
@@ -15,12 +18,29 @@ use std::env;
 
 use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::jwt::Claims;
-use crate::models::schema::{App, Token, TokenInsertable, User, UserInsertable};
+use crate::models::response::MessageResponse;
+use crate::models::schema::{
+    App, Group, GroupInsertable, Group_OwnersInsertable, Group_UsersInsertable, Token,
+    TokenInsertable, User, UserInsertable,
+};
+use rand::distributions::Alphanumeric;
+
+#[derive(Deserialize, Serialize, Debug, JsonSchema)]
+pub struct RequestPasswordRequest {
+    email_id: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct AppResponse {
     name: String,
     logo_url: Option<String>,
+    app_url: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct CreateGroupRequest {
+    id: String,
+    description: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -91,6 +111,12 @@ pub struct ChangePasswordRequest {
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct ChangePasswordResponse {
     message: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, JsonSchema)]
+pub struct ResetPasswordRequest {
+    token: String,
+    new_password: String,
 }
 
 #[openapi()]
@@ -239,7 +265,7 @@ pub fn login(
             .values(TokenInsertable {
                 session_hash: Some(refresh_token.clone()),
                 user_id: u.id,
-                app_id: a.id,
+                app_id: Some(a.id),
             })
             .execute(&mut conn)
             .expect("Error inserting token");
@@ -410,11 +436,13 @@ pub fn get_app_by_client_id(
 
     match app
         .filter(client_id.eq(&client_id_))
+        .filter(disabled.eq(false))
         .first::<App>(&mut conn)
     {
         Ok(a) => Ok(Json(AppResponse {
             name: a.name,
             logo_url: a.logo_url,
+            app_url: a.app_url,
         })),
         Err(_) => Err(rocket::http::Status::NotFound),
     }
@@ -428,4 +456,221 @@ pub fn get_group_memberships(
     groups: GroupMemberships,
 ) -> Result<Json<Vec<String>>, rocket::http::Status> {
     Ok(Json(groups.0))
+}
+
+#[openapi()]
+#[post("/create-group", data = "<create_request>")]
+pub fn create_group(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    claims: Claims,
+    create_request: Json<CreateGroupRequest>,
+    cache_pool: &State<Pool<RedisConnectionManager>>,
+) -> Result<Json<Group>, rocket::http::Status> {
+    use crate::models::schema::schema::group::dsl::*;
+    use crate::models::schema::schema::group_owners::dsl::*;
+    use crate::models::schema::schema::group_users::dsl::*;
+
+    let mut conn = rdb
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    let mut cache_connection = cache_pool
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    // Check if the group already exists
+    let group_exists = group
+        .filter(identifier.eq(&create_request.id))
+        .first::<Group>(&mut conn)
+        .optional()
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    if group_exists.is_some() {
+        return Err(rocket::http::Status::Conflict);
+    }
+
+    // Insert the new group and get the result
+    let new_group = GroupInsertable {
+        identifier: create_request.id.clone(),
+        disabled: false,
+        short_text: create_request.description.clone(),
+    };
+
+    let created_group = diesel::insert_into(group)
+        .values(&new_group)
+        .get_result::<Group>(&mut conn)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    // Insert into group_users
+    let new_group_user = Group_UsersInsertable {
+        user_id: claims.user_id.parse::<i64>().unwrap(),
+        group_id: created_group.id,
+    };
+
+    diesel::insert_into(group_users)
+        .values(&new_group_user)
+        .execute(&mut conn)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    // Insert into group_owners
+    let new_group_owner = Group_OwnersInsertable {
+        user_id: claims.user_id.parse::<i64>().unwrap(),
+        group_id: created_group.id,
+    };
+
+    diesel::insert_into(group_owners)
+        .values(&new_group_owner)
+        .execute(&mut conn)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    let cache_key = format!("user_groups:{}", claims.user_id);
+
+    let _ = match cache_connection.del::<_, i32>(&cache_key) {
+        Ok(_) => Ok(Json(&created_group)),
+        Err(_) => Err({}),
+    };
+
+    Ok(Json(created_group))
+}
+
+#[openapi()]
+#[post("/request-password", data = "<request>")]
+pub fn request_password_reset(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    cache: &State<Pool<RedisConnectionManager>>,
+    request: Json<RequestPasswordRequest>,
+) -> Result<Json<MessageResponse>, rocket::http::Status> {
+    use crate::models::schema::schema::user::dsl::*;
+
+    let mut cache_connection = cache
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    let mut conn = rdb
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    // Find the user by email
+    let u = user
+        .filter(email_id.eq(&request.email_id))
+        .first::<User>(&mut conn)
+        .map_err(|_| rocket::http::Status::NotFound)?;
+
+    // Generate a random hash value
+    let token_value: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(30)
+        .map(char::from)
+        .collect();
+    println!("{:?}", token_value);
+    // Insert the token into the database
+    let _: () = cache_connection
+        .set_ex(&token_value, u.id, 3600) // Token expires in 1 hour
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    // TODO: Send an email to the user
+
+    Ok(Json(MessageResponse {
+        message: "Password reset token created successfully".to_string(),
+    }))
+}
+
+#[openapi()]
+#[post("/reset-password", data = "<request>")]
+pub fn reset_password(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    cache: &State<Pool<RedisConnectionManager>>,
+    request: Json<ResetPasswordRequest>,
+) -> Result<Json<MessageResponse>, rocket::http::Status> {
+    use crate::models::schema::schema::user::dsl::*;
+
+    let mut cache_connection = cache
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    let mut conn = rdb
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    // Get user ID from cache using the token
+    let user_id: i64 = cache_connection
+        .get(&request.token)
+        .map_err(|_| rocket::http::Status::NotFound)?;
+
+    // Hash the new password
+    let new_hashed_password = hash(&request.new_password, DEFAULT_COST)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    // Update the user's password in the database
+    let updated_rows = update(user.filter(id.eq(user_id)))
+        .set(password_hash.eq(Some(new_hashed_password)))
+        .execute(&mut conn)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    if updated_rows > 0 {
+        // Delete the token from cache
+        let _: () = cache_connection
+            .del(&request.token)
+            .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+        Ok(Json(MessageResponse {
+            message: "Password updated successfully".to_string(),
+        }))
+    } else {
+        Err(rocket::http::Status::InternalServerError)
+    }
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct CreateApiTokenRequest {
+    pub days_to_expire: i64,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct CreateApiTokenResponse {
+    pub api_token: String,
+}
+#[openapi]
+#[post("/create-api-token", data = "<create_request>")]
+pub fn create_api_token(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    create_request: Json<CreateApiTokenRequest>,
+    claims: Claims,
+) -> status::Custom<Json<CreateApiTokenResponse>> {
+    let mut conn = rdb.get().expect("Failed to get DB connection");
+
+    // Extract information from claims
+    let user_id = claims.user_id.clone();
+    let first_name = claims.first_name.clone();
+    let last_name = claims.last_name.clone();
+    let middle_name = claims.middle_name.clone();
+    let client_id = claims.client_id.clone();
+    let email = claims.sub.clone();
+
+    // Generate a JWT token
+    let expiration = Utc::now() + Duration::days(create_request.days_to_expire);
+    let new_claims = Claims {
+        sub: email,
+        exp: expiration.timestamp() as usize,
+        user_id,
+        token_type: "api".to_string(),
+        first_name,
+        last_name,
+        middle_name,
+        client_id,
+    };
+
+    let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let token = encode(
+        &Header::default(),
+        &new_claims,
+        &EncodingKey::from_secret(secret.as_ref()),
+    )
+    .expect("Failed to create token");
+
+    // Return the generated token
+    status::Custom(
+        Status::Ok,
+        Json(CreateApiTokenResponse { api_token: token }),
+    )
 }

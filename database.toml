@@ -5,4 +5,4 @@ orm = "Diesel"
 root = "src/models"
 
 [tables]
-names = ["user", "token", "app", "group"]
+names = ["user", "token", "app", "group", "apitokens"]

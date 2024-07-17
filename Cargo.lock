@@ -15,6 +15,7 @@ dependencies = [
  "mongodb",
  "okapi",
  "r2d2_redis",
+ "rand",
  "redis 0.25.4",
  "rocket",
  "rocket_okapi",

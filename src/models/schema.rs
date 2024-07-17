@@ -2,7 +2,7 @@
 #![allow(non_camel_case_types)]
 use diesel::Insertable;
 use chrono::NaiveDate;
-use diesel::{deserialize::Queryable, table, Selectable};
+use diesel::{deserialize::Queryable, Selectable};
 use schemars::JsonSchema;
 use serde::Serialize;
 use chrono::offset::Utc;
@@ -41,7 +41,7 @@ pub mod schema {
             #[max_length = 400]
             session_hash ->Nullable<Varchar>,
             user_id ->BigInt,
-            app_id ->BigInt,
+            app_id ->Nullable<BigInt>,
             id ->BigInt,
             
         }
@@ -55,6 +55,9 @@ pub mod schema {
             name ->Varchar,
             #[max_length = 200]
             logo_url ->Nullable<Varchar>,
+            disabled ->Bool,
+            #[max_length = 100]
+            app_url ->Nullable<Varchar>,
             id ->BigInt,
             
         }
@@ -65,6 +68,8 @@ pub mod schema {
             #[max_length = 50]
             identifier ->Varchar,
             disabled ->Bool,
+            #[max_length = 100]
+            short_text ->Nullable<Varchar>,
             id ->BigInt,
             
         }
@@ -88,6 +93,18 @@ pub mod schema {
         }
     }
     
+    table! {
+        apitokens (id) {
+            user_id ->BigInt,
+            #[max_length = 200]
+            api_token ->Varchar,
+            expired ->Bool,
+            expiry_date ->Nullable<Date>,
+            id ->BigInt,
+            
+        }
+    }
+    
     
         
     
@@ -101,6 +118,8 @@ pub mod schema {
     
         
     
+        diesel::joinable!(apitokens -> user (user_id));
+    
 
     diesel::allow_tables_to_appear_in_same_query!(
         user,
@@ -109,11 +128,12 @@ pub mod schema {
         group,
         group_users,
         group_owners,
+        apitokens,
         
     );
 }
 
-use schema::{ user,token,app,group,group_users,group_owners, };
+use schema::{ user,token,app,group,group_users,group_owners,apitokens, };
 
 
 
@@ -143,7 +163,7 @@ pub struct User {
 pub struct Token {
     pub session_hash:Option<String>,
     pub user_id:i64,
-    pub app_id:i64,
+    pub app_id:Option<i64>,
     pub id:i64,
     
 }
@@ -157,6 +177,8 @@ pub struct App {
     pub client_id:String,
     pub name:String,
     pub logo_url:Option<String>,
+    pub disabled:bool,
+    pub app_url:Option<String>,
     pub id:i64,
     
 }
@@ -169,6 +191,7 @@ pub struct App {
 pub struct Group {
     pub identifier:String,
     pub disabled:bool,
+    pub short_text:Option<String>,
     pub id:i64,
     
 }
@@ -194,6 +217,20 @@ pub struct Group_Owners {
     pub id:i64,
     pub user_id:i64,
     pub group_id:i64,
+    
+}
+
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable,Associations)]
+#[diesel(belongs_to(User, foreign_key = user_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(table_name = apitokens)]
+pub struct Apitokens {
+    pub user_id:i64,
+    pub api_token:String,
+    pub expired:bool,
+    pub expiry_date:Option<NaiveDate>,
+    pub id:i64,
     
 }
 
@@ -225,7 +262,7 @@ pub struct UserInsertable {
 pub struct TokenInsertable {
     pub session_hash:Option<String>,
     pub user_id:i64,
-    pub app_id:i64,
+    pub app_id:Option<i64>,
     
 }
 
@@ -238,6 +275,8 @@ pub struct AppInsertable {
     pub client_id:String,
     pub name:String,
     pub logo_url:Option<String>,
+    pub disabled:bool,
+    pub app_url:Option<String>,
     
 }
 
@@ -249,6 +288,7 @@ pub struct AppInsertable {
 pub struct GroupInsertable {
     pub identifier:String,
     pub disabled:bool,
+    pub short_text:Option<String>,
     
 }
 
@@ -271,5 +311,18 @@ pub struct Group_UsersInsertable {
 pub struct Group_OwnersInsertable {
     pub user_id:i64,
     pub group_id:i64,
+    
+}
+
+
+#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema,Associations)]
+#[diesel(belongs_to(User, foreign_key = user_id))]
+#[diesel(check_for_backend(diesel::pg::Pg))]
+#[diesel(table_name = apitokens)]
+pub struct ApitokensInsertable {
+    pub user_id:i64,
+    pub api_token:String,
+    pub expired:bool,
+    pub expiry_date:Option<NaiveDate>,
     
 }

@@ -19,6 +19,7 @@ jsonwebtoken = "9.3.0"
 mongodb = "2.1.0"
 okapi = {version = "0.7.0"}
 r2d2_redis = "0.14.0"
+rand = "0.8.5"
 redis = "0.25.3"
 rocket = {version = "0.5.0-rc.2", default-features = false, features = [
   "json",
