@@ -3,7 +3,7 @@
 version = 3
 
 [[package]]
-name = "IAM"
+name = "IAMService"
 version = "0.4.0-nightly.0"
 dependencies = [
  "bcrypt",

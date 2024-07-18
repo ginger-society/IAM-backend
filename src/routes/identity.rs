@@ -674,3 +674,58 @@ pub fn create_api_token(
         Json(CreateApiTokenResponse { api_token: token }),
     )
 }
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct LogoutRequest {
+    refresh_token: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct LogoutResponse {
+    message: String,
+}
+
+#[openapi()]
+#[post("/logout", data = "<logout_request>")]
+pub fn logout(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    cache: &State<Pool<RedisConnectionManager>>,
+    logout_request: Json<LogoutRequest>,
+    claims: Claims,
+) -> Result<Json<LogoutResponse>, rocket::http::Status> {
+    use crate::models::schema::schema::token::dsl::*;
+
+    let mut conn = rdb
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    let mut cache_connection = cache
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    // Verify if the refresh token exists in the database
+    let refresh_token_exists: bool = token
+        .filter(session_hash.eq(&logout_request.refresh_token))
+        .filter(user_id.eq(claims.user_id.parse::<i64>().unwrap()))
+        .execute(&mut conn)
+        .is_ok();
+
+    if !refresh_token_exists {
+        return Err(rocket::http::Status::Unauthorized);
+    }
+
+    // Delete the refresh token from the database
+    diesel::delete(token.filter(session_hash.eq(&logout_request.refresh_token)))
+        .execute(&mut conn)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    // Clear the Redis cache related to the user session
+    let cache_key = format!("user_session:{}", claims.user_id);
+    let _: () = cache_connection
+        .del(&cache_key)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    Ok(Json(LogoutResponse {
+        message: "Logged out successfully".to_string(),
+    }))
+}

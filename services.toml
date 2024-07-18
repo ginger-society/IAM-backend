@@ -1,0 +1,10 @@
+dir = "."
+lang = "Rust"
+spec_url = "/openapi.json"
+
+[services]
+
+[urls]
+dev = "http://localhost:8080"
+prod = "https://exampleapi.com"
+stage = "https://exampleapi.com"
