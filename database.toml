@@ -3,6 +3,8 @@ url = "http://localhost:8000"
 lang = "Rust"
 orm = "Diesel"
 root = "src/models"
+schema_id = "9fc00233-8f60-413a-9635-a9c39fb62650"
+branch = "main"
 
 [tables]
 names = ["user", "token", "app", "group", "apitokens"]
