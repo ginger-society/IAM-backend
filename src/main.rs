@@ -29,7 +29,7 @@ fn rocket() -> Rocket<Build> {
         .attach(prometheus.clone())
         .attach(AuthFairing)
         .mount(
-            "/",
+            "/iam/",
             openapi_get_routes![
                 routes::index,
                 identity::register,
@@ -48,13 +48,13 @@ fn rocket() -> Rocket<Build> {
             ],
         )
         .mount(
-            "/api-docs",
+            "/iam/api-docs",
             make_swagger_ui(&SwaggerUIConfig {
                 url: "../openapi.json".to_owned(),
                 ..Default::default()
             }),
         )
-        .mount("/metrics", prometheus);
+        .mount("/iam/metrics", prometheus);
 
     match env::var("MONGO_URI") {
         Ok(mongo_uri) => match env::var("MONGO_DB_NAME") {

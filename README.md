@@ -55,3 +55,22 @@ cargo test
   - Additional tables for group memberships and permissions (if applicable).
 
 
+
+Build : 
+
+```sh
+docker build . -t gingersociety/iam-service-api-stage --platform=linux/amd64
+```
+
+
+Push : 
+
+```sh
+Docker push gingersociety/iam-service-api-stage:latest
+```
+
+to restart the deployment / upgrade the pod image version 
+```sh 
+
+ kubectl rollout restart deployment iam-service-api-deployment
+```
