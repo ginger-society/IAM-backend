@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build, Push Docker Image, and Restart Deployment
 
 on:
   push:
@@ -21,3 +21,15 @@ jobs:
 
     - name: Push Docker image
       run: docker push ${{ secrets.DOCKER_HUB_USERNAME }}/iam-service-api-stage:latest
+
+    - name: Set up Kubeconfig
+      run: echo "${{ secrets.STAGING_K8_CONFIG }}" > $HOME/.kube/config
+
+    - name: Install kubectl
+      run: |
+        curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x ./kubectl
+        sudo mv ./kubectl /usr/local/bin/kubectl
+
+    - name: Restart Kubernetes deployment
+      run: kubectl rollout restart deployment iam-service-api-deployment
