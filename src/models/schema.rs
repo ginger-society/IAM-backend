@@ -57,7 +57,11 @@ pub mod schema {
             logo_url ->Nullable<Varchar>,
             disabled ->Bool,
             #[max_length = 100]
-            app_url ->Nullable<Varchar>,
+            app_url_dev ->Nullable<Varchar>,
+            #[max_length = 100]
+            app_url_stage ->Nullable<Varchar>,
+            #[max_length = 100]
+            app_url_prod ->Nullable<Varchar>,
             id ->BigInt,
             
         }
@@ -93,18 +97,6 @@ pub mod schema {
         }
     }
     
-    table! {
-        apitokens (id) {
-            user_id ->BigInt,
-            #[max_length = 200]
-            api_token ->Varchar,
-            expired ->Bool,
-            expiry_date ->Nullable<Date>,
-            id ->BigInt,
-            
-        }
-    }
-    
     
         
     
@@ -118,8 +110,6 @@ pub mod schema {
     
         
     
-        diesel::joinable!(apitokens -> user (user_id));
-    
 
     diesel::allow_tables_to_appear_in_same_query!(
         user,
@@ -128,12 +118,11 @@ pub mod schema {
         group,
         group_users,
         group_owners,
-        apitokens,
         
     );
 }
 
-use schema::{ user,token,app,group,group_users,group_owners,apitokens, };
+use schema::{ user,token,app,group,group_users,group_owners, };
 
 
 
@@ -178,7 +167,9 @@ pub struct App {
     pub name:String,
     pub logo_url:Option<String>,
     pub disabled:bool,
-    pub app_url:Option<String>,
+    pub app_url_dev:Option<String>,
+    pub app_url_stage:Option<String>,
+    pub app_url_prod:Option<String>,
     pub id:i64,
     
 }
@@ -217,20 +208,6 @@ pub struct Group_Owners {
     pub id:i64,
     pub user_id:i64,
     pub group_id:i64,
-    
-}
-
-
-#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, JsonSchema,Identifiable,Associations)]
-#[diesel(belongs_to(User, foreign_key = user_id))]
-#[diesel(check_for_backend(diesel::pg::Pg))]
-#[diesel(table_name = apitokens)]
-pub struct Apitokens {
-    pub user_id:i64,
-    pub api_token:String,
-    pub expired:bool,
-    pub expiry_date:Option<NaiveDate>,
-    pub id:i64,
     
 }
 
@@ -276,7 +253,9 @@ pub struct AppInsertable {
     pub name:String,
     pub logo_url:Option<String>,
     pub disabled:bool,
-    pub app_url:Option<String>,
+    pub app_url_dev:Option<String>,
+    pub app_url_stage:Option<String>,
+    pub app_url_prod:Option<String>,
     
 }
 
@@ -311,18 +290,5 @@ pub struct Group_UsersInsertable {
 pub struct Group_OwnersInsertable {
     pub user_id:i64,
     pub group_id:i64,
-    
-}
-
-
-#[derive(Queryable, Debug, Selectable, Serialize, Deserialize, Insertable, JsonSchema,Associations)]
-#[diesel(belongs_to(User, foreign_key = user_id))]
-#[diesel(check_for_backend(diesel::pg::Pg))]
-#[diesel(table_name = apitokens)]
-pub struct ApitokensInsertable {
-    pub user_id:i64,
-    pub api_token:String,
-    pub expired:bool,
-    pub expiry_date:Option<NaiveDate>,
     
 }

@@ -4,7 +4,7 @@ lang = "Rust"
 orm = "Diesel"
 root = "src/models"
 schema_id = "98f3dec4-ee06-4f38-9d23-a130233a5a78"
-url = "http://localhost:8000"
+url = "http://localhost:9002"
 
 [tables]
-names = ["user", "token", "app", "group", "apitokens"]
+names = ["user", "token", "app", "group"]

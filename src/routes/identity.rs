@@ -34,7 +34,9 @@ pub struct RequestPasswordRequest {
 pub struct AppResponse {
     name: String,
     logo_url: Option<String>,
-    app_url: Option<String>,
+    app_url_dev: Option<String>,
+    app_url_stage: Option<String>,
+    app_url_prod: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -442,7 +444,9 @@ pub fn get_app_by_client_id(
         Ok(a) => Ok(Json(AppResponse {
             name: a.name,
             logo_url: a.logo_url,
-            app_url: a.app_url,
+            app_url_dev: a.app_url_dev,
+            app_url_stage: a.app_url_stage,
+            app_url_prod: a.app_url_prod,
         })),
         Err(_) => Err(rocket::http::Status::NotFound),
     }
