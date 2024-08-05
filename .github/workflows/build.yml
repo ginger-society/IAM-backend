@@ -45,3 +45,7 @@ jobs:
       run: ./ginger-connector publish stage
       env:
         GINGER_TOKEN: ${{ secrets.GINGER_TOKEN }}
+    - name: Publish stage using ginger-connector
+      run: ./ginger-connector publish stage-k8
+      env:
+        GINGER_TOKEN: ${{ secrets.GINGER_TOKEN }}
