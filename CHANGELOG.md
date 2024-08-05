@@ -1,4 +1,32 @@
+## 0.5.0-nightly.0 - 2024-08-05
+feat:
+ - [8e286d0c90](8e286d0c90f3a1ae22980bc636cf3e4ca377da5d) (Ginger Society Admin) feat: updated CI to publish metadata
+	
+ - [f93a350c31](f93a350c31b9a8e1ffbee7f56c663ee8c10e4132) (Ginger Society Admin) feat: added dev , stage and prod url in app details
+	
+ - [1b028e2235](1b028e2235fa4290fce9f91010513059d66ae3c4) (Ginger Society Admin) feat: added k8 deployment restart command in the pipeline
+	
+ - [c8d8d1680d](c8d8d1680d6ce7fd7f5825dd9ca8d457c5d0ae5d) (Ginger Society Admin) feat: added pipeline workflows and updated docker files
+	
+ - [a286068c4e](a286068c4ecbe0d7f6fe89cbf35e194aa2c4c132) (Ginger Society Admin) feat: tested with metaservice
+	
+ - [8377e68306](8377e683060f577bad2db7549bfd7eba737f1a06) (Ginger Society Admin) feat: added logout endpoint
+	
+ - [7ccb4a23b4](7ccb4a23b49ae88217484c38dbf3be3fd6110f33) (Ginger Society Admin) feat: added create group , password reset apis and create api token endpoint
+	
+ - [1d526bdd8a](1d526bdd8a457c380da0c46b792d4709983e2071) (Ginger Society Admin) feat: added get group memberships endpoint
+	
+ - [c6e6f89316](c6e6f8931668ca5c136c7d8a2079d9f88c38cc39) (Ginger Society Admin) feat: added get app details endpoint
+	
+fix:
+ - [a24cfc880b](a24cfc880b9977eb30ad7f53d7131aebab6a5863) (Ginger Society Admin) fix: pipeline fixes
+	
+ - [7703a6b712](7703a6b712fb871933e58b5f946b7553dfc67429) (Ginger Society Admin) fix: pipeline fixes
+	
 ## 0.4.0-nightly.0 - 2024-07-14
+chore:
+ - [be0bdd1e5e](be0bdd1e5ea0f709c9e680ae1221fd5d9e537a94) (Ginger Society Admin) chore: version bump to 0.4.0-nightly.0
+	
 feat:
  - [1cc8d1e9fd](1cc8d1e9fd1cde041f68c69169729d6178d415bb) (Ginger Society Admin) feat: updated readme and added is_root column in User table
 	
