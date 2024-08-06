@@ -1,6 +1,4 @@
-# First stage: Build the Rust application
-FROM rust:1-slim-bullseye as builder
-RUN apt-get update && apt-get install -y pkg-config libssl-dev libpq-dev
+FROM gingersociety/rust-rocket-api-builder:latest as builder
 
 # Create a new directory for the app
 WORKDIR /app
@@ -8,19 +6,16 @@ WORKDIR /app
 # Copy the current directory contents into the container at /app
 COPY . .
 
+ARG GINGER_TOKEN
+ENV GINGER_TOKEN=$GINGER_TOKEN
+
+RUN ginger-connector connect stage-k8
+
 # Build the application in release mode
 RUN cargo build --release
 
 # Second stage: Create the minimal runtime image
-FROM debian:bullseye-slim
-
-# Install necessary dependencies
-RUN apt-get update && apt-get install -y \
-    libssl1.1 \
-    libpq5 \
-    libgcc1 \
-    libc6 \
-    && rm -rf /var/lib/apt/lists/*
+FROM gingersociety/rust-rocket-api-runner:latest
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/target/release/IAMService /app/
