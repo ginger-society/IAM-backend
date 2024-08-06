@@ -6,11 +6,6 @@ WORKDIR /app
 # Copy the current directory contents into the container at /app
 COPY . .
 
-ARG GINGER_TOKEN
-ENV GINGER_TOKEN=$GINGER_TOKEN
-
-RUN ginger-connector connect stage-k8
-
 # Build the application in release mode
 RUN cargo build --release
 
