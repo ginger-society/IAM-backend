@@ -192,10 +192,22 @@ pub fn change_password(
 pub fn register(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     register_request: Json<RegisterRequest>,
-) -> Json<String> {
+) -> Result<Json<String>, Status> {
     use crate::models::schema::schema::user::dsl::*;
 
     let mut conn = rdb.get().expect("Failed to get DB connection");
+
+    // Check if the user with the same email already exists
+    let existing_user = user
+        .filter(email_id.eq(&register_request.email))
+        .first::<User>(&mut conn)
+        .optional()
+        .map_err(|_| Status::InternalServerError)?;
+
+    if let Some(_) = existing_user {
+        return Err(Status::Conflict);
+    }
+
     let hashed_password =
         hash(&register_request.password, DEFAULT_COST).expect("Failed to hash password");
 
@@ -216,7 +228,7 @@ pub fn register(
         .execute(&mut conn)
         .expect("Error inserting new user");
 
-    Json("User registered successfully".to_string())
+    Ok(Json("User registered successfully".to_string()))
 }
 
 #[openapi()]
