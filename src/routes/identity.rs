@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 
 use crate::middlewares::groups::GroupMemberships;
+use crate::middlewares::groups_owned::GroupOwnerships;
 use crate::middlewares::jwt::Claims;
 use crate::models::response::MessageResponse;
 use crate::models::schema::{
@@ -453,13 +454,23 @@ pub fn get_app_by_client_id(
 }
 
 #[openapi]
-#[get("/group-memberships")]
+#[get("/group-ownerships")]
 pub fn get_group_memberships(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     claims: Claims,
     groups: GroupMemberships,
 ) -> Result<Json<Vec<String>>, rocket::http::Status> {
     Ok(Json(groups.0))
+}
+
+#[openapi]
+#[get("/group-memberships")]
+pub fn get_group_ownserships(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    claims: Claims,
+    groups_owned: GroupOwnerships,
+) -> Result<Json<Vec<String>>, rocket::http::Status> {
+    Ok(Json(groups_owned.0))
 }
 
 #[openapi()]

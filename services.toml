@@ -6,7 +6,7 @@ spec_url = "/openapi.json"
 [services]
 
 [urls]
-dev = "http://localhost:8080"
+dev = "http://localhost:8080/iam"
 prod = "https://exampleapi.com"
 prod_k8 = "https://exampleapi.com"
 stage = "https://api-staging.gingersociety.org/iam"
