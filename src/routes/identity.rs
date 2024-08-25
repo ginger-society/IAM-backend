@@ -19,11 +19,11 @@ use std::env;
 
 use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::groups_owned::GroupOwnerships;
-use crate::middlewares::jwt::Claims;
+use crate::middlewares::jwt::{APIClaims, Claims};
 use crate::models::response::MessageResponse;
 use crate::models::schema::{
-    App, Group, GroupInsertable, Group_OwnersInsertable, Group_UsersInsertable, Token,
-    TokenInsertable, User, UserInsertable,
+    Api_Token, Api_TokenInsertable, App, Group, GroupInsertable, Group_OwnersInsertable,
+    Group_UsersInsertable, Token, TokenInsertable, User, UserInsertable,
 };
 use rand::distributions::Alphanumeric;
 
@@ -652,12 +652,15 @@ pub fn reset_password(
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct CreateApiTokenRequest {
     pub days_to_expire: i64,
+    pub name: String,
+    pub group_identifier: String, // Changed to i64 for consistency with your schema
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct CreateApiTokenResponse {
     pub api_token: String,
 }
+
 #[openapi]
 #[post("/create-api-token", data = "<create_request>")]
 pub fn create_api_token(
@@ -665,15 +668,18 @@ pub fn create_api_token(
     create_request: Json<CreateApiTokenRequest>,
     claims: Claims,
 ) -> status::Custom<Json<CreateApiTokenResponse>> {
+    use crate::models::schema::schema::api_token::dsl::*;
+    use crate::models::schema::schema::group::dsl as group_dsl;
+
     let mut conn = rdb.get().expect("Failed to get DB connection");
 
     // Extract information from claims
-    let user_id = claims.user_id.clone();
-    let first_name = claims.first_name.clone();
-    let last_name = claims.last_name.clone();
-    let middle_name = claims.middle_name.clone();
-    let client_id = claims.client_id.clone();
-    let email = claims.sub.clone();
+    let user_id = claims.user_id;
+    let first_name = claims.first_name;
+    let last_name = claims.last_name;
+    let middle_name = claims.middle_name;
+    let client_id = claims.client_id;
+    let email = claims.sub;
 
     // Generate a JWT token
     let expiration = Utc::now() + Duration::days(create_request.days_to_expire);
@@ -696,13 +702,35 @@ pub fn create_api_token(
     )
     .expect("Failed to create token");
 
+    // Find the group by its identifier
+    let group: Group = group_dsl::group
+        .filter(group_dsl::identifier.eq(&create_request.group_identifier))
+        .first::<Group>(&mut conn)
+        .map_err(|_| Status::NotFound)
+        .unwrap();
+
+    // Insert the new API token into the database
+    let new_token = Api_TokenInsertable {
+        parent_id: group.id,
+        expiry_date: expiration.naive_utc().date(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        is_active: true, // Assuming token is active by default
+        name: create_request.name.clone(),
+        token_str: Some(token.clone()),
+    };
+
+    diesel::insert_into(api_token)
+        .values(&new_token)
+        .execute(&mut conn)
+        .expect("Failed to insert new API token");
+
     // Return the generated token
     status::Custom(
         Status::Ok,
         Json(CreateApiTokenResponse { api_token: token }),
     )
 }
-
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct LogoutRequest {
     refresh_token: String,
@@ -916,4 +944,66 @@ pub fn manage_membership(
     }
 
     Ok(Json(json!({ "status": "success" })))
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct CreateSessionTokenRequest {
+    pub api_token: String,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct CreateSessionTokenResponse {
+    pub session_token: String,
+}
+
+#[openapi()]
+#[post("/create-api-session-token", data = "<request>")]
+pub fn create_api_session_token(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    request: Json<CreateSessionTokenRequest>,
+) -> status::Custom<Json<CreateSessionTokenResponse>> {
+    use crate::models::schema::schema::api_token::dsl as api_token_dsl;
+
+    let mut conn = rdb.get().expect("Failed to get DB connection");
+
+    // Check if the provided API token is valid
+    let api_token_result: QueryResult<Api_Token> = api_token_dsl::api_token
+        .filter(api_token_dsl::token_str.eq(&request.api_token))
+        .filter(api_token_dsl::is_active.eq(true))
+        .first::<Api_Token>(&mut conn);
+
+    let api_token = match api_token_result {
+        Ok(token) => token,
+        Err(_) => {
+            return status::Custom(
+                Status::Unauthorized,
+                Json(CreateSessionTokenResponse {
+                    session_token: "".to_string(),
+                }),
+            );
+        }
+    };
+
+    // Generate a JWT session token valid for 5 minutes
+    let expiration = Utc::now() + Duration::minutes(5);
+    let claims = APIClaims {
+        sub: api_token.token_str.unwrap_or_else(|| "session".to_string()),
+        exp: expiration.timestamp() as usize,
+        group_id: api_token.parent_id, // Use parent_id from the Api_Token
+    };
+
+    let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let token = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_ref()),
+    )
+    .expect("Failed to create session token");
+
+    status::Custom(
+        Status::Ok,
+        Json(CreateSessionTokenResponse {
+            session_token: token,
+        }),
+    )
 }

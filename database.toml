@@ -1,10 +1,10 @@
 [schema]
-branch = "main"
+url = "http://localhost:9002"
 lang = "Rust"
 orm = "Diesel"
 root = "src/models"
 schema_id = "a56e44a9-cfc6-4f69-9b7f-510789b6fa80"
-url = "http://localhost:9002"
+branch = "main"
 
 [tables]
-names = ["user", "token", "app", "group"]
+names = ["user", "token", "app", "group", "api_token"]

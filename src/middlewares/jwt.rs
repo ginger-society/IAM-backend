@@ -23,6 +23,13 @@ pub struct Claims {
     pub client_id: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct APIClaims {
+    pub sub: String,
+    pub exp: usize,
+    pub group_id: i64,
+}
+
 use std::env;
 
 use rocket::{
