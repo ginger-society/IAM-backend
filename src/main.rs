@@ -46,7 +46,7 @@ fn rocket() -> Rocket<Build> {
                 identity::create_api_token,
                 identity::logout,
                 identity::get_group_ownserships,
-                identity::manage_users,
+                identity::get_members,
                 identity::manage_membership
             ],
         )
