@@ -1,5 +1,5 @@
 use bcrypt::{hash, verify, DEFAULT_COST};
-use chrono::{Duration, Utc};
+use chrono::{Duration, NaiveDate, NaiveDateTime, Utc};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{insert_into, PgConnection, RunQueryDsl};
 use diesel::{prelude::*, update};
@@ -1006,4 +1006,79 @@ pub fn create_api_session_token(
             session_token: token,
         }),
     )
+}
+
+/// Struct to represent the API token response
+#[derive(Serialize, JsonSchema)]
+pub struct GroupApiTokenResponse {
+    pub expiry_date: NaiveDate,
+    pub created_at: chrono::DateTime<Utc>,
+    pub is_active: bool,
+    pub name: String,
+}
+
+#[openapi()]
+#[get("/api-tokens/<group_identifier>")]
+pub fn get_api_tokens_by_group(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    group_identifier: String,
+) -> Result<status::Custom<Json<Vec<GroupApiTokenResponse>>>, status::Custom<String>> {
+    use crate::models::schema::schema::api_token::dsl as api_token_dsl;
+    use crate::models::schema::schema::group::dsl as group_dsl;
+
+    // Acquire a database connection from the pool
+    let mut conn = rdb.get().map_err(|_| {
+        status::Custom(
+            Status::InternalServerError,
+            "Failed to acquire database connection".to_string(),
+        )
+    })?;
+
+    // Step 1: Retrieve the group based on the provided group_identifier
+    let group = group_dsl::group
+        .filter(group_dsl::identifier.eq(&group_identifier))
+        .first::<Group>(&mut conn)
+        .optional()
+        .map_err(|_| {
+            status::Custom(
+                Status::InternalServerError,
+                "Database query failed".to_string(),
+            )
+        })?;
+
+    // If the group does not exist, return a 404 Not Found error
+    let group = match group {
+        Some(g) => g,
+        None => {
+            return Err(status::Custom(
+                Status::NotFound,
+                format!("Group with identifier '{}' not found", group_identifier),
+            ));
+        }
+    };
+
+    // Step 2: Retrieve all API tokens associated with the group's primary key (group.id)
+    let tokens = api_token_dsl::api_token
+        .filter(api_token_dsl::parent_id.eq(group.id))
+        .load::<Api_Token>(&mut conn)
+        .map_err(|_| {
+            status::Custom(
+                Status::InternalServerError,
+                "Failed to retrieve API tokens".to_string(),
+            )
+        })?;
+
+    // Step 3: Map the retrieved tokens to the response struct
+    let response: Vec<GroupApiTokenResponse> = tokens
+        .into_iter()
+        .map(|t| GroupApiTokenResponse {
+            expiry_date: t.expiry_date,
+            created_at: t.created_at,
+            is_active: t.is_active,
+            name: t.name,
+        })
+        .collect();
+
+    // Step 4: Return the response with a 200 OK status
+    Ok(status::Custom(Status::Ok, Json(response)))
 }
