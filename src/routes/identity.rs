@@ -768,8 +768,8 @@ pub struct UserInfo {
 }
 
 #[openapi()]
-#[get("/manage-users/<group_identifier>")]
-pub fn manage_users(
+#[get("/get_members/<group_identifier>")]
+pub fn get_members(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     group_identifier: String,
 ) -> Result<Json<Vec<UserInfo>>, Status> {
