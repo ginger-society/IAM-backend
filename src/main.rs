@@ -45,7 +45,9 @@ fn rocket() -> Rocket<Build> {
                 identity::reset_password,
                 identity::create_api_token,
                 identity::logout,
-                identity::get_group_ownserships
+                identity::get_group_ownserships,
+                identity::manage_users,
+                identity::manage_membership
             ],
         )
         .mount(
