@@ -765,6 +765,7 @@ pub struct UserInfo {
     middle_name: Option<String>,
     pk: i64,
     is_admin: bool,
+    email_id: String,
 }
 
 #[openapi()]
@@ -797,9 +798,10 @@ pub fn get_members(
             users_dsl::first_name.nullable(),
             users_dsl::last_name.nullable(),
             users_dsl::middle_name.nullable(),
+            users_dsl::email_id,
             users_dsl::id,
         ))
-        .load::<(Option<String>, Option<String>, Option<String>, i64)>(&mut conn)
+        .load::<(Option<String>, Option<String>, Option<String>, String, i64)>(&mut conn)
         .map_err(|_| Status::InternalServerError)?;
 
     // Fetch the group owners
@@ -812,24 +814,27 @@ pub fn get_members(
     // Map the user information into the UserInfo struct
     let user_info: Vec<UserInfo> = users
         .into_iter()
-        .map(|(first_name, last_name, middle_name, pk)| UserInfo {
-            first_name: first_name.unwrap_or_default(),
-            last_name: last_name.unwrap_or_default(),
-            middle_name,
-            pk,
-            is_admin: group_owners.contains(&pk),
-        })
+        .map(
+            |(first_name, last_name, middle_name, email_id, pk)| UserInfo {
+                first_name: first_name.unwrap_or_default(),
+                last_name: last_name.unwrap_or_default(),
+                middle_name,
+                pk,
+                is_admin: group_owners.contains(&pk),
+                email_id,
+            },
+        )
         .collect();
 
     Ok(Json(user_info))
 }
 
 #[openapi()]
-#[put("/manage-membership/<group_identifier>/<user_pk>/<action>")]
+#[put("/manage-membership/<group_identifier>/<user_id>/<action>")]
 pub fn manage_membership(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     group_identifier: String,
-    user_pk: i64,
+    user_id: String,
     action: String,
 ) -> Result<Json<Value>, Status> {
     let mut conn = rdb.get().map_err(|_| Status::ServiceUnavailable)?;
@@ -837,11 +842,17 @@ pub fn manage_membership(
     use crate::models::schema::schema::group::dsl as group_dsl;
     use crate::models::schema::schema::group_owners::dsl as group_owners_dsl;
     use crate::models::schema::schema::group_users::dsl as group_users_dsl;
+    use crate::models::schema::schema::user::dsl as user_dsl;
 
     // Find the group by its identifier
-    let group = group_dsl::group
+    let group: Group = group_dsl::group
         .filter(group_dsl::identifier.eq(&group_identifier))
         .first::<Group>(&mut conn)
+        .map_err(|_| Status::NotFound)?;
+
+    let user: User = user_dsl::user
+        .filter(user_dsl::email_id.eq(&user_id))
+        .first::<User>(&mut conn)
         .map_err(|_| Status::NotFound)?;
 
     match action.as_str() {
@@ -849,7 +860,7 @@ pub fn manage_membership(
             // Remove the user from owners
             diesel::delete(
                 group_owners_dsl::group_owners
-                    .filter(group_owners_dsl::user_id.eq(user_pk))
+                    .filter(group_owners_dsl::user_id.eq(user.id))
                     .filter(group_owners_dsl::group_id.eq(group.id)),
             )
             .execute(&mut conn)
@@ -858,7 +869,7 @@ pub fn manage_membership(
             // Add the user as a member
             diesel::insert_into(group_users_dsl::group_users)
                 .values((
-                    group_users_dsl::user_id.eq(user_pk),
+                    group_users_dsl::user_id.eq(user.id),
                     group_users_dsl::group_id.eq(group.id),
                 ))
                 .execute(&mut conn)
@@ -868,7 +879,7 @@ pub fn manage_membership(
             // Add the user as a member
             diesel::insert_into(group_users_dsl::group_users)
                 .values((
-                    group_users_dsl::user_id.eq(user_pk),
+                    group_users_dsl::user_id.eq(user.id),
                     group_users_dsl::group_id.eq(group.id),
                 ))
                 .execute(&mut conn)
@@ -877,7 +888,7 @@ pub fn manage_membership(
             // Add the user as an owner
             diesel::insert_into(group_owners_dsl::group_owners)
                 .values((
-                    group_owners_dsl::user_id.eq(user_pk),
+                    group_owners_dsl::user_id.eq(user.id),
                     group_owners_dsl::group_id.eq(group.id),
                 ))
                 .execute(&mut conn)
@@ -887,7 +898,7 @@ pub fn manage_membership(
             // Remove the user from members and owners
             diesel::delete(
                 group_users_dsl::group_users
-                    .filter(group_users_dsl::user_id.eq(user_pk))
+                    .filter(group_users_dsl::user_id.eq(user.id))
                     .filter(group_users_dsl::group_id.eq(group.id)),
             )
             .execute(&mut conn)
@@ -895,7 +906,7 @@ pub fn manage_membership(
 
             diesel::delete(
                 group_owners_dsl::group_owners
-                    .filter(group_owners_dsl::user_id.eq(user_pk))
+                    .filter(group_owners_dsl::user_id.eq(user.id))
                     .filter(group_owners_dsl::group_id.eq(group.id)),
             )
             .execute(&mut conn)
