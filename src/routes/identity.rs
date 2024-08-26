@@ -1065,42 +1065,30 @@ pub fn get_api_tokens_by_group(
     // Step 4: Return the response with a 200 OK status
     Ok(Json(response))
 }
+
 #[openapi()]
 #[put("/api-tokens/<token_id>/deactivate")]
 pub fn deactivate_api_token(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     token_id: i64,
-) -> Result<status::Custom<String>, status::Custom<String>> {
+) -> Result<Json<MessageResponse>, rocket::http::Status> {
     use crate::models::schema::schema::api_token::dsl::*;
 
     // Acquire a database connection from the pool
-    let mut conn = rdb.get().map_err(|_| {
-        status::Custom(
-            Status::InternalServerError,
-            "Failed to acquire database connection".to_string(),
-        )
-    })?;
+    let mut conn = rdb.get().map_err(|_| Status::InternalServerError)?;
 
     // Step 1: Find the API token by its ID
     let token = api_token
         .find(token_id)
         .first::<Api_Token>(&mut conn)
         .optional()
-        .map_err(|_| {
-            status::Custom(
-                Status::InternalServerError,
-                "Database query failed".to_string(),
-            )
-        })?;
+        .map_err(|_| Status::InternalServerError)?;
 
     // If the token does not exist, return a 404 Not Found error
-    let token = match token {
+    match token {
         Some(t) => t,
         None => {
-            return Err(status::Custom(
-                Status::NotFound,
-                format!("API token with id '{}' not found", token_id),
-            ));
+            return Err(Status::NotFound);
         }
     };
 
@@ -1108,16 +1096,10 @@ pub fn deactivate_api_token(
     diesel::update(api_token.filter(id.eq(token_id)))
         .set(is_active.eq(false))
         .execute(&mut conn)
-        .map_err(|_| {
-            status::Custom(
-                Status::InternalServerError,
-                "Failed to deactivate API token".to_string(),
-            )
-        })?;
+        .map_err(|_| Status::InternalServerError)?;
 
     // Step 3: Return a success message
-    Ok(status::Custom(
-        Status::Ok,
-        format!("API token with id '{}' has been deactivated", token_id),
-    ))
+    Ok(Json(MessageResponse {
+        message: format!("API token with id '{}' has been deactivated", token_id),
+    }))
 }
