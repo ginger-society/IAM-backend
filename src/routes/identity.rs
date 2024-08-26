@@ -17,9 +17,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::env;
 
+use crate::middlewares::api_jwt::APIClaims;
 use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::groups_owned::GroupOwnerships;
-use crate::middlewares::jwt::{APIClaims, Claims};
+use crate::middlewares::jwt::Claims;
 use crate::models::response::MessageResponse;
 use crate::models::schema::{
     Api_Token, Api_TokenInsertable, App, Group, GroupInsertable, Group_OwnersInsertable,
