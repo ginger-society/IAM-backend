@@ -22,6 +22,7 @@ use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::groups_owned::GroupOwnerships;
 use crate::middlewares::jwt::Claims;
 use crate::models::response::MessageResponse;
+use crate::models::schema::schema::group::identifier;
 use crate::models::schema::{
     Api_Token, Api_TokenInsertable, App, Group, GroupInsertable, Group_OwnersInsertable,
     Group_UsersInsertable, Token, TokenInsertable, User, UserInsertable,
@@ -988,7 +989,7 @@ pub fn create_api_session_token(
     // Generate a JWT session token valid for 5 minutes
     let expiration = Utc::now() + Duration::minutes(5);
     let claims = APIClaims {
-        sub: api_token.token_str.unwrap_or_else(|| "session".to_string()),
+        sub: api_token.id.to_string(),
         exp: expiration.timestamp() as usize,
         group_id: api_token.parent_id, // Use parent_id from the Api_Token
     };
@@ -1007,6 +1008,46 @@ pub fn create_api_session_token(
             session_token: token,
         }),
     )
+}
+
+#[openapi()]
+#[post("/create-api-session-token-interactive/<group_identifier>")]
+pub fn create_api_session_token_interactive(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    claims: Claims,
+    group_identifier: String,
+) -> Result<Json<CreateSessionTokenResponse>, rocket::http::Status> {
+    use crate::models::schema::schema::group::dsl as group_dsl;
+
+    let mut conn = rdb.get().expect("Failed to get DB connection");
+
+    let group = group_dsl::group
+        .filter(group_dsl::identifier.eq(group_identifier))
+        .first::<Group>(&mut conn)
+        .optional()
+        .map_err(|_| Status::InternalServerError)?;
+
+    let group = group.ok_or(Status::NotFound)?;
+
+    // Generate a JWT session token valid for 5 minutes
+    let expiration = Utc::now() + Duration::minutes(5);
+    let claims = APIClaims {
+        sub: claims.user_id,
+        exp: expiration.timestamp() as usize,
+        group_id: group.id, // Use parent_id from the Api_Token
+    };
+
+    let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    let token = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_ref()),
+    )
+    .expect("Failed to create session token");
+
+    Ok(Json(CreateSessionTokenResponse {
+        session_token: token,
+    }))
 }
 
 /// Struct to represent the API token response
