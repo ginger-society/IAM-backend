@@ -36,6 +36,7 @@ fn rocket() -> Rocket<Build> {
                 identity::login,
                 identity::refresh_token,
                 identity::validate_token,
+                identity::validate_api_token,
                 identity::change_password,
                 identity::update_profile,
                 identity::get_app_by_client_id,

@@ -107,6 +107,14 @@ pub struct ValidateTokenResponse {
     client_id: String,
 }
 
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct ValidateAPITokenResponse {
+    sub: String,
+    exp: usize,
+    scopes: Vec<String>,
+    group_id: i64,
+}
+
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct ChangePasswordRequest {
     email: String,
@@ -372,6 +380,19 @@ pub fn validate_token(claims: Claims) -> Result<Json<ValidateTokenResponse>, roc
         last_name: claims.last_name,
         middle_name: claims.middle_name,
         client_id: claims.client_id,
+    }))
+}
+
+#[openapi()]
+#[get("/validate-api-token")]
+pub fn validate_api_token(
+    claims: APIClaims,
+) -> Result<Json<ValidateAPITokenResponse>, rocket::http::Status> {
+    Ok(Json(ValidateAPITokenResponse {
+        sub: claims.sub,
+        exp: claims.exp,
+        group_id: claims.group_id,
+        scopes: claims.scopes,
     }))
 }
 
