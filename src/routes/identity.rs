@@ -487,7 +487,6 @@ pub fn get_group_ownserships(
 ) -> Result<Json<Vec<String>>, rocket::http::Status> {
     Ok(Json(groups_owned.0))
 }
-
 #[openapi()]
 #[post("/create-group", data = "<create_request>")]
 pub fn create_group(
@@ -495,31 +494,48 @@ pub fn create_group(
     claims: Claims,
     create_request: Json<CreateGroupRequest>,
     cache_pool: &State<Pool<RedisConnectionManager>>,
-) -> Result<Json<Group>, rocket::http::Status> {
+) -> Result<Json<Group>, status::Custom<String>> {
     use crate::models::schema::schema::group::dsl::*;
     use crate::models::schema::schema::group_owners::dsl::*;
     use crate::models::schema::schema::group_users::dsl::*;
 
-    let mut conn = rdb
-        .get()
-        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+    // Attempt to get a database connection
+    let mut conn = rdb.get().map_err(|_| {
+        status::Custom(
+            rocket::http::Status::ServiceUnavailable,
+            "Database connection is unavailable.".to_string(),
+        )
+    })?;
 
-    let mut cache_connection = cache_pool
-        .get()
-        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+    // Attempt to get a cache connection
+    let mut cache_connection = cache_pool.get().map_err(|_| {
+        status::Custom(
+            rocket::http::Status::ServiceUnavailable,
+            "Cache connection is unavailable.".to_string(),
+        )
+    })?;
 
     // Check if the group already exists
     let group_exists = group
         .filter(identifier.eq(&create_request.id))
         .first::<Group>(&mut conn)
         .optional()
-        .map_err(|_| rocket::http::Status::InternalServerError)?;
+        .map_err(|_| {
+            status::Custom(
+                rocket::http::Status::InternalServerError,
+                "Error checking if the group already exists.".to_string(),
+            )
+        })?;
 
+    // If the group already exists, return a conflict status
     if group_exists.is_some() {
-        return Err(rocket::http::Status::Conflict);
+        return Err(status::Custom(
+            rocket::http::Status::Conflict,
+            "A group with this identifier already exists.".to_string(),
+        ));
     }
 
-    // Insert the new group and get the result
+    // Attempt to insert the new group
     let new_group = GroupInsertable {
         identifier: create_request.id.clone(),
         disabled: false,
@@ -529,9 +545,14 @@ pub fn create_group(
     let created_group = diesel::insert_into(group)
         .values(&new_group)
         .get_result::<Group>(&mut conn)
-        .map_err(|_| rocket::http::Status::InternalServerError)?;
+        .map_err(|_| {
+            status::Custom(
+                rocket::http::Status::InternalServerError,
+                "Error creating the new group.".to_string(),
+            )
+        })?;
 
-    // Insert into group_users
+    // Attempt to insert into group_users
     let new_group_user = Group_UsersInsertable {
         user_id: claims.user_id.parse::<i64>().unwrap(),
         group_id: created_group.id,
@@ -540,9 +561,14 @@ pub fn create_group(
     diesel::insert_into(group_users)
         .values(&new_group_user)
         .execute(&mut conn)
-        .map_err(|_| rocket::http::Status::InternalServerError)?;
+        .map_err(|_| {
+            status::Custom(
+                rocket::http::Status::InternalServerError,
+                "Error adding the user to the group.".to_string(),
+            )
+        })?;
 
-    // Insert into group_owners
+    // Attempt to insert into group_owners
     let new_group_owner = Group_OwnersInsertable {
         user_id: claims.user_id.parse::<i64>().unwrap(),
         group_id: created_group.id,
@@ -551,15 +577,24 @@ pub fn create_group(
     diesel::insert_into(group_owners)
         .values(&new_group_owner)
         .execute(&mut conn)
-        .map_err(|_| rocket::http::Status::InternalServerError)?;
+        .map_err(|_| {
+            status::Custom(
+                rocket::http::Status::InternalServerError,
+                "Error adding the user as a group owner.".to_string(),
+            )
+        })?;
 
+    // Attempt to delete the user's cached groups
     let cache_key = format!("user_groups:{}", claims.user_id);
 
-    let _ = match cache_connection.del::<_, i32>(&cache_key) {
-        Ok(_) => Ok(Json(&created_group)),
-        Err(_) => Err({}),
-    };
+    let _ = cache_connection.del::<_, i32>(&cache_key).map_err(|_| {
+        status::Custom(
+            rocket::http::Status::InternalServerError,
+            "Error clearing the user's cached group list.".to_string(),
+        )
+    })?;
 
+    // If everything is successful, return the created group
     Ok(Json(created_group))
 }
 
@@ -992,6 +1027,7 @@ pub fn create_api_session_token(
         sub: api_token.id.to_string(),
         exp: expiration.timestamp() as usize,
         group_id: api_token.parent_id, // Use parent_id from the Api_Token
+        scopes: vec!["read".to_string(), "write".to_string()],
     };
 
     let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
@@ -1010,24 +1046,33 @@ pub fn create_api_session_token(
     )
 }
 
+/// this is used by the developers on their machine for creating a session. This assumes that there is an active session on the machine
 #[openapi()]
 #[post("/create-api-session-token-interactive/<group_identifier>")]
 pub fn create_api_session_token_interactive(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     claims: Claims,
     group_identifier: String,
+    groups_ownerships: GroupOwnerships,
 ) -> Result<Json<CreateSessionTokenResponse>, rocket::http::Status> {
     use crate::models::schema::schema::group::dsl as group_dsl;
 
     let mut conn = rdb.get().expect("Failed to get DB connection");
 
     let group = group_dsl::group
-        .filter(group_dsl::identifier.eq(group_identifier))
+        .filter(group_dsl::identifier.eq(group_identifier.clone()))
         .first::<Group>(&mut conn)
         .optional()
         .map_err(|_| Status::InternalServerError)?;
 
     let group = group.ok_or(Status::NotFound)?;
+
+    // Determine the scope based on ownership
+    let scopes = if groups_ownerships.0.contains(&group_identifier.clone()) {
+        vec!["read".to_string(), "write".to_string()]
+    } else {
+        vec!["read".to_string()]
+    };
 
     // Generate a JWT session token valid for 5 minutes
     let expiration = Utc::now() + Duration::minutes(5);
@@ -1035,6 +1080,7 @@ pub fn create_api_session_token_interactive(
         sub: claims.user_id,
         exp: expiration.timestamp() as usize,
         group_id: group.id, // Use parent_id from the Api_Token
+        scopes,
     };
 
     let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");

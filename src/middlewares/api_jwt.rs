@@ -23,6 +23,7 @@ pub struct APIClaims {
     pub sub: String,
     pub exp: usize,
     pub group_id: i64,
+    pub scopes: Vec<String>,
 }
 
 #[derive(Debug)]
