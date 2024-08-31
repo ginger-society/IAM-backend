@@ -76,7 +76,7 @@ impl<'a> OpenApiFromRequest<'a> for APIClaims {
         security_req.insert("BearerAuth".to_owned(), Vec::new());
 
         Ok(RequestHeaderInput::Security(
-            "BearerAuth".to_owned(),
+            "BearerAPIAuth".to_owned(),
             security_scheme,
             security_req,
         ))
