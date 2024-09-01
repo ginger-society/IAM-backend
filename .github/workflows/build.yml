@@ -40,12 +40,21 @@ jobs:
       run: |
         curl -LO "https://ginger-connector-binaries.s3.ap-south-1.amazonaws.com/0.1.0/x86_64-unknown-linux-gnu/ginger-connector"
         chmod +x ./ginger-connector
+        curl -LO "https://ginger-auth-binaries.s3.ap-south-1.amazonaws.com/0.1.0/x86_64-unknown-linux-gnu/ginger-auth"
+        chmod +x ./ginger-auth
+
+    - name: Authenticate with ginger-auth
+      id: ginger-auth
+      run: |
+        GINGER_API_TOKEN=$(./ginger-auth token-login ${{ secrets.GINGER_TOKEN }})
+        echo "GINGER_API_TOKEN=$GINGER_API_TOKEN" >> $GITHUB_ENV
 
     - name: Publish stage using ginger-connector
       run: ./ginger-connector publish stage
       env:
-        GINGER_TOKEN: ${{ secrets.GINGER_TOKEN }}
+        GINGER_API_TOKEN: ${{ env.GINGER_API_TOKEN }}
+
     - name: Publish stage using ginger-connector for k8
       run: ./ginger-connector publish stage-k8
       env:
-        GINGER_TOKEN: ${{ secrets.GINGER_TOKEN }}
+        GINGER_API_TOKEN: ${{ env.GINGER_API_TOKEN }}
