@@ -45,9 +45,7 @@ jobs:
 
     - name: Authenticate with ginger-auth
       id: ginger-auth
-      run: |
-        GINGER_API_TOKEN=$(./ginger-auth token-login ${{ secrets.GINGER_TOKEN }})
-        echo "GINGER_API_TOKEN=$GINGER_API_TOKEN" >> $GITHUB_ENV
+      run: ./ginger-auth token-login ${{ secrets.GINGER_TOKEN }}
 
     - name: Publish stage using ginger-connector
       run: ./ginger-connector publish stage
