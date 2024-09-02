@@ -20,7 +20,6 @@ FROM gingersociety/rust-rocket-api-runner:latest
 
 # Copy the compiled binary from the builder stage
 COPY --from=builder /app/target/release/IAMService /app/
-COPY --from=builder /app/.env /app/
 
 # Set the working directory
 WORKDIR /app
