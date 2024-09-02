@@ -38,7 +38,7 @@ jobs:
 
     - name: Install ginger-connector
       run: |
-        curl -LO "https://ginger-connector-binaries.s3.ap-south-1.amazonaws.com/0.1.0/x86_64-unknown-linux-gnu/ginger-connector"
+        curl -LO "https://ginger-connector-binaries.s3.ap-south-1.amazonaws.com/0.7.0-nightly.0/x86_64-unknown-linux-gnu/ginger-connector"
         chmod +x ./ginger-connector
         curl -LO "https://ginger-auth-binaries.s3.ap-south-1.amazonaws.com/0.1.0/x86_64-unknown-linux-gnu/ginger-auth"
         chmod +x ./ginger-auth
