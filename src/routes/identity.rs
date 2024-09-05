@@ -1098,7 +1098,7 @@ pub fn create_api_session_token_interactive(
     // Generate a JWT session token valid for 5 minutes
     let expiration = Utc::now() + Duration::minutes(500);
     let claims = APIClaims {
-        sub: claims.user_id,
+        sub: group.identifier,
         exp: expiration.timestamp() as usize,
         group_id: group.id, // Use parent_id from the Api_Token
         scopes,
