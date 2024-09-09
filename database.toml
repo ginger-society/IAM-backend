@@ -1,10 +1,11 @@
 [schema]
-url = "http://localhost:9002"
+branch = "main"
+cache_schema_id = "a3f5e631-8225-4ac5-85b9-71ecd107bb6c"
 lang = "Rust"
 orm = "Diesel"
 root = "src/models"
 schema_id = "a56e44a9-cfc6-4f69-9b7f-510789b6fa80"
-branch = "main"
+url = "http://localhost:9002"
 
 [tables]
 names = ["user", "token", "app", "group", "api_token"]
