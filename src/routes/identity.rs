@@ -508,6 +508,37 @@ pub fn get_group_ownserships(
 ) -> Result<Json<Vec<String>>, rocket::http::Status> {
     Ok(Json(groups_owned.0))
 }
+
+#[openapi]
+#[get("/clear-redis")]
+pub fn clear_redis(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    claims: Claims,
+    cache_pool: &State<Pool<RedisConnectionManager>>,
+) -> Result<Json<String>, rocket::http::Status> {
+    // Attempt to get a connection from the Redis pool
+    let mut cache_connection = cache_pool
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    // Create cache keys using the user's ID from claims
+    let cache_key = format!("user_groups:{}", claims.user_id);
+    let cache_key_2 = format!("groups_owned:{}", claims.user_id);
+
+    // Attempt to delete the first cache key
+    cache_connection
+        .del::<_, i32>(&cache_key)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    // Attempt to delete the second cache key
+    cache_connection
+        .del::<_, i32>(&cache_key_2)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    // Return success message
+    Ok(Json("Successfully cleared Redis cache.".to_string()))
+}
+
 #[openapi()]
 #[post("/create-group", data = "<create_request>")]
 pub fn create_group(
