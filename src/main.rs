@@ -53,7 +53,8 @@ fn rocket() -> Rocket<Build> {
                 identity::get_api_tokens_by_group,
                 identity::deactivate_api_token,
                 identity::create_api_session_token_interactive,
-                identity::clear_redis
+                identity::clear_redis,
+                identity::get_group_members_ids
             ],
         )
         .mount(
