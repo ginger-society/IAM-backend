@@ -52,3 +52,6 @@ jobs:
       run: ginger-connector publish stage-k8
       env:
         GINGER_API_TOKEN: ${{ env.GINGER_API_TOKEN }}
+
+    - name: Trigger dependent pipelines
+      run: ginger-connector trigger-dependent-pipelines ${{ env.GH_TOKEN }}
