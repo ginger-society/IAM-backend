@@ -8,12 +8,8 @@ COPY . .
 # Run the ginger-auth command and capture the output
 RUN ginger-auth token-login $GINGER_TOKEN
 
-RUN ginger-connector update-pipeline stage running
-
 # Build the application in release mode
 RUN cargo build --release
-
-RUN ginger-connector update-pipeline stage passing
 
 # Second stage: Create the minimal runtime image
 FROM gingersociety/rust-rocket-api-runner:latest
