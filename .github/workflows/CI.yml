@@ -16,6 +16,10 @@ jobs:
     - name: Install ginger-apps
       run: bash -c "$(curl -fsSL https://raw.githubusercontent.com/ginger-society/infra-as-code-repo/main/rust-helpers/install-pipeline-clis.sh)"
 
+    - name: Authenticate with ginger-auth
+      id: ginger-auth
+      run: ginger-auth token-login ${{ secrets.GINGER_TOKEN }}
+
     - name: Update status to running
       run: ginger-connector update-pipeline stage running
 
@@ -41,10 +45,6 @@ jobs:
 
     - name: Restart Kubernetes deployment
       run: kubectl rollout restart deployment iam-service-api-deployment
-
-    - name: Authenticate with ginger-auth
-      id: ginger-auth
-      run: ginger-auth token-login ${{ secrets.GINGER_TOKEN }}
 
     - name: Publish stage using ginger-connector
       run: ginger-connector publish stage
