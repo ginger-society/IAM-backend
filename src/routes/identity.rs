@@ -41,6 +41,7 @@ pub struct AppResponse {
     app_url_dev: Option<String>,
     app_url_stage: Option<String>,
     app_url_prod: Option<String>,
+    tnc_link: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -484,6 +485,7 @@ pub fn get_app_by_client_id(
             app_url_dev: a.app_url_dev,
             app_url_stage: a.app_url_stage,
             app_url_prod: a.app_url_prod,
+            tnc_link: a.tnc_link,
         })),
         Err(_) => Err(rocket::http::Status::NotFound),
     }
