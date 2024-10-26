@@ -1,3 +1,5 @@
 .env
 target
 src/models/schema.rs
+NotificationService_client
+.ginger.tmp

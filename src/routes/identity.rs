@@ -16,11 +16,14 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::env;
+use NotificationService::apis::crate_api::{send_email, SendEmailParams};
+use NotificationService::models::EmailRequest;
 
 use crate::middlewares::api_jwt::APIClaims;
 use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::groups_owned::GroupOwnerships;
 use crate::middlewares::jwt::Claims;
+use crate::middlewares::NotificationService_config::NotificationService_config;
 use crate::models::response::MessageResponse;
 use crate::models::schema::schema::group::identifier;
 use crate::models::schema::{
@@ -656,10 +659,11 @@ pub fn create_group(
 
 #[openapi()]
 #[post("/request-password", data = "<request>")]
-pub fn request_password_reset(
+pub async fn request_password_reset(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     cache: &State<Pool<RedisConnectionManager>>,
     request: Json<RequestPasswordRequest>,
+    notification_config: NotificationService_config,
 ) -> Result<Json<MessageResponse>, rocket::http::Status> {
     use crate::models::schema::schema::user::dsl::*;
 
@@ -691,9 +695,24 @@ pub fn request_password_reset(
 
     // TODO: Send an email to the user
 
-    Ok(Json(MessageResponse {
-        message: "Password reset token created successfully".to_string(),
-    }))
+    match send_email(
+        &notification_config.0,
+        SendEmailParams {
+            email_request: EmailRequest {
+                to: request.email_id.clone(),
+                subject: "Password Reset".to_string(),
+                message: format!("Use this token to reset your password: {}", token_value),
+                reply_to: None,
+            },
+        },
+    )
+    .await
+    {
+        Ok(_) => Ok(Json(MessageResponse {
+            message: "Password reset token created successfully".to_string(),
+        })),
+        Err(_) => Err(Status::ServiceUnavailable),
+    }
 }
 
 #[openapi()]
