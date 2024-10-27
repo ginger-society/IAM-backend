@@ -315,6 +315,11 @@ pub fn registeration_confirmation(
         .get(&registration_token)
         .map_err(|_| rocket::http::Status::NotFound)?;
 
+    // Remove the token from cache after reading
+    cache_connection
+        .del(&registration_token)
+        .map_err(|_| Status::InternalServerError)?;
+
     let register_request: RegisterRequestValue = serde_json::from_str(&user_data).unwrap();
 
     let new_user = UserInsertable {
