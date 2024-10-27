@@ -39,6 +39,7 @@ use rand::distributions::Alphanumeric;
 #[derive(Deserialize, Serialize, Debug, JsonSchema)]
 pub struct RequestPasswordRequest {
     email_id: String,
+    app_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -712,7 +713,7 @@ pub async fn request_password_reset(
             email_request: EmailRequest {
                 to: request.email_id.clone(),
                 subject: "Password Reset".to_string(),
-                message: format!("Use this token to reset your password: {}", token_value),
+                message: format!("Use this link to reset your password: https://iam-staging.gingersociety.org/#/{}/reset-password/{}", request.app_id, token_value),
                 reply_to: None,
             },
         },
