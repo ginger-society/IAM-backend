@@ -7,7 +7,7 @@ WORKDIR /app
 COPY . .
 # Run the ginger-auth command and capture the output
 RUN ginger-auth token-login $GINGER_TOKEN
-
+RUN ginger-connector connect stage-k8
 # Build the application in release mode
 RUN cargo build --release
 
