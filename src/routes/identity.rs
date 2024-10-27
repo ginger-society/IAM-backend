@@ -17,6 +17,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::env;
 use NotificationService::apis::crate_api::{send_email, SendEmailParams};
+use NotificationService::get_configuration as get_notification_service_configuration;
+
+use NotificationService::apis::configuration::ApiKey as NotificationApiKey;
+
 use NotificationService::models::EmailRequest;
 
 use crate::middlewares::api_jwt::APIClaims;
@@ -663,7 +667,6 @@ pub async fn request_password_reset(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     cache: &State<Pool<RedisConnectionManager>>,
     request: Json<RequestPasswordRequest>,
-    notification_config: NotificationService_config,
 ) -> Result<Json<MessageResponse>, rocket::http::Status> {
     use crate::models::schema::schema::user::dsl::*;
 
@@ -693,10 +696,18 @@ pub async fn request_password_reset(
         .set_ex(&token_value, u.id, 3600) // Token expires in 1 hour
         .map_err(|_| rocket::http::Status::InternalServerError)?;
 
-    // TODO: Send an email to the user
+    let mut configuration = get_notification_service_configuration(); // Assuming Configuration::new or get_configuration exists
+
+    let token_str = env::var("ISC_SECRET").expect("ISC_SECRET must be set");
+
+    // Assuming Configuration has a method to set api_key
+    configuration.api_key = Some(NotificationApiKey {
+        key: token_str,
+        prefix: None,
+    });
 
     match send_email(
-        &notification_config.0,
+        &configuration,
         SendEmailParams {
             email_request: EmailRequest {
                 to: request.email_id.clone(),
