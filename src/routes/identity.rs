@@ -86,6 +86,13 @@ pub struct RefreshTokenResponse {
 pub struct RegisterRequest {
     email: String,
     password: String,
+    app_id: String,
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct RegisterRequestValue {
+    email: String,
+    hashed_password: String,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
@@ -210,13 +217,18 @@ pub fn change_password(
 
 #[openapi()]
 #[post("/register", data = "<register_request>")]
-pub fn register(
+pub async fn register(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    cache: &State<Pool<RedisConnectionManager>>,
     register_request: Json<RegisterRequest>,
 ) -> Result<Json<String>, Status> {
     use crate::models::schema::schema::user::dsl::*;
 
     let mut conn = rdb.get().expect("Failed to get DB connection");
+
+    let mut cache_connection = cache
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
 
     // Check if the user with the same email already exists
     let existing_user = user
@@ -232,15 +244,88 @@ pub fn register(
     let hashed_password =
         hash(&register_request.password, DEFAULT_COST).expect("Failed to hash password");
 
+    // Generate a random hash value
+    let registration_token_value: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(30)
+        .map(char::from)
+        .collect();
+
+    let registration_cache_value = RegisterRequestValue {
+        email: register_request.email.clone(),
+        hashed_password: hashed_password,
+    };
+
+    // Insert the user registration data into the cache
+    let _: () = cache_connection
+        .set_ex(
+            &registration_token_value,
+            serde_json::to_string(&registration_cache_value).unwrap(),
+            3600,
+        ) // Token expires in 1 hour
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    let mut configuration = get_notification_service_configuration();
+
+    let token_str = env::var("ISC_SECRET").expect("ISC_SECRET must be set");
+
+    configuration.api_key = Some(NotificationApiKey {
+        key: token_str,
+        prefix: None,
+    });
+
+    match send_email(
+            &configuration,
+            SendEmailParams {
+                email_request: EmailRequest {
+                    to: register_request.email.clone(),
+                    subject: "Password Reset".to_string(),
+                    message: format!("Use this link to reset your password: https://iam-staging.gingersociety.org/#/{}/registration-confirmation/{}", register_request.app_id, registration_token_value),
+                    reply_to: None,
+                },
+            },
+        ).await{
+            Ok(_) => {
+                Ok(Json(
+                    "User registration request generated successfully".to_string(),
+                ))
+            }Err(_) => {
+                Err(Status::ServiceUnavailable)
+            }
+        }
+}
+
+#[openapi()]
+#[get("/confirm-register/<registration_token>")]
+pub fn registeration_confirmation(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    cache: &State<Pool<RedisConnectionManager>>,
+    registration_token: String,
+) -> Result<Json<String>, Status> {
+    use crate::models::schema::schema::user::dsl::*;
+
+    let mut conn = rdb.get().expect("Failed to get DB connection");
+
+    let mut cache_connection = cache
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    // Get user ID from cache using the token
+    let user_data: String = cache_connection
+        .get(&registration_token)
+        .map_err(|_| rocket::http::Status::NotFound)?;
+
+    let register_request: RegisterRequestValue = serde_json::from_str(&user_data).unwrap();
+
     let new_user = UserInsertable {
         first_name: None,
         last_name: None,
         middle_name: None,
-        email_id: register_request.email.clone(),
+        email_id: register_request.email,
         mobile_number: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
-        password_hash: Some(hashed_password.clone()),
+        password_hash: Some(register_request.hashed_password),
         is_root: false,
     };
 
@@ -697,11 +782,10 @@ pub async fn request_password_reset(
         .set_ex(&token_value, u.id, 3600) // Token expires in 1 hour
         .map_err(|_| rocket::http::Status::InternalServerError)?;
 
-    let mut configuration = get_notification_service_configuration(); // Assuming Configuration::new or get_configuration exists
+    let mut configuration = get_notification_service_configuration();
 
     let token_str = env::var("ISC_SECRET").expect("ISC_SECRET must be set");
 
-    // Assuming Configuration has a method to set api_key
     configuration.api_key = Some(NotificationApiKey {
         key: token_str,
         prefix: None,
