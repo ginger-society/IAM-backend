@@ -261,7 +261,7 @@ pub async fn register(
         .set_ex(
             &registration_token_value,
             serde_json::to_string(&registration_cache_value).unwrap(),
-            3600,
+            300,
         ) // Token expires in 1 hour
         .map_err(|_| rocket::http::Status::InternalServerError)?;
 
@@ -279,8 +279,8 @@ pub async fn register(
             SendEmailParams {
                 email_request: EmailRequest {
                     to: register_request.email.clone(),
-                    subject: "Password Reset".to_string(),
-                    message: format!("Use this link to reset your password: https://iam-staging.gingersociety.org/#/{}/registration-confirmation/{}", register_request.app_id, registration_token_value),
+                    subject: "Confirm Registration".to_string(),
+                    message: format!("Use this link (expires within 5 minutes) to confirm your registration: https://iam-staging.gingersociety.org/#/{}/registration-confirmation/{}", register_request.app_id, registration_token_value),
                     reply_to: None,
                 },
             },
@@ -779,7 +779,7 @@ pub async fn request_password_reset(
     println!("{:?}", token_value);
     // Insert the token into the database
     let _: () = cache_connection
-        .set_ex(&token_value, u.id, 3600) // Token expires in 1 hour
+        .set_ex(&token_value, u.id, 300) // Token expires in 1 hour
         .map_err(|_| rocket::http::Status::InternalServerError)?;
 
     let mut configuration = get_notification_service_configuration();
@@ -797,7 +797,7 @@ pub async fn request_password_reset(
             email_request: EmailRequest {
                 to: request.email_id.clone(),
                 subject: "Password Reset".to_string(),
-                message: format!("Use this link to reset your password: https://iam-staging.gingersociety.org/#/{}/reset-password/{}", request.app_id, token_value),
+                message: format!("Use this link(expires within 5 minutes) to reset your password: https://iam-staging.gingersociety.org/#/{}/reset-password/{}", request.app_id, token_value),
                 reply_to: None,
             },
         },
