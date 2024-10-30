@@ -97,6 +97,6 @@ jobs:
         if: success()
         run: ginger-connector trigger-dependent-pipelines ${{ secrets.GH_TOKEN }}
       
-      - name: Trigger dependent pipelines
+      - name: Trigger NotificationService pipeline
         if: success()
         run: ginger-connector trigger-pipeline NotificationService ${{ secrets.GH_TOKEN }}
