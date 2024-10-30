@@ -1,8 +1,8 @@
-use super::jwt::Claims;
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 use diesel::r2d2::Pool;
-use diesel::{PgConnection, RunQueryDsl};
+use diesel::PgConnection;
+use ginger_shared_rs::rocket_utils::Claims;
 use r2d2_redis::redis::Commands;
 use r2d2_redis::RedisConnectionManager;
 use rocket::http::Status;

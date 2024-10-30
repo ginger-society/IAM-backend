@@ -1,8 +1,10 @@
 use bcrypt::{hash, verify, DEFAULT_COST};
-use chrono::{Duration, NaiveDate, NaiveDateTime, Utc};
+use chrono::{Duration, Utc};
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::{insert_into, PgConnection, RunQueryDsl};
 use diesel::{prelude::*, update};
+use ginger_shared_rs::rocket_models::MessageResponse;
+use ginger_shared_rs::rocket_utils::{APIClaims, Claims};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use r2d2_redis::redis::Commands;
 use r2d2_redis::RedisConnectionManager;
@@ -23,131 +25,27 @@ use NotificationService::apis::configuration::ApiKey as NotificationApiKey;
 
 use NotificationService::models::EmailRequest;
 
-use crate::middlewares::api_jwt::APIClaims;
 use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::groups_owned::GroupOwnerships;
-use crate::middlewares::jwt::Claims;
-use crate::middlewares::NotificationService_config::NotificationService_config;
-use crate::models::response::MessageResponse;
-use crate::models::schema::schema::group::identifier;
+use crate::models::request::{
+    ChangePasswordRequest, CreateApiTokenRequest, CreateGroupRequest, CreateSessionTokenRequest,
+    LoginRequest, LogoutRequest, RefreshTokenRequest, RegisterRequest, RequestPasswordRequest,
+    ResetPasswordRequest, UpdateProfileRequest,
+};
+use crate::models::response::{
+    AppResponse, CreateApiTokenResponse, CreateSessionTokenResponse, GroupApiTokenResponse,
+    LoginResponse, RefreshTokenResponse, UserInfoResponse, ValidateAPITokenResponse,
+    ValidateTokenResponse,
+};
 use crate::models::schema::{
     Api_Token, Api_TokenInsertable, App, Group, GroupInsertable, Group_OwnersInsertable,
-    Group_UsersInsertable, Token, TokenInsertable, User, UserInsertable,
+    Group_UsersInsertable, TokenInsertable, User, UserInsertable,
 };
 use rand::distributions::Alphanumeric;
-
-#[derive(Deserialize, Serialize, Debug, JsonSchema)]
-pub struct RequestPasswordRequest {
-    email_id: String,
-    app_id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, JsonSchema)]
-pub struct AppResponse {
-    name: String,
-    logo_url: Option<String>,
-    app_url_dev: Option<String>,
-    app_url_stage: Option<String>,
-    app_url_prod: Option<String>,
-    tnc_link: Option<String>,
-    allow_registration: bool,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct CreateGroupRequest {
-    id: String,
-    description: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct UpdateProfileRequest {
-    first_name: Option<String>,
-    middle_name: Option<String>,
-    last_name: Option<String>,
-    mobile_number: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct UpdateProfileResponse {
-    message: String,
-}
-
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct RefreshTokenRequest {
-    refresh_token: String,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct RefreshTokenResponse {
-    access_token: String,
-}
-
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct RegisterRequest {
-    email: String,
-    password: String,
-    app_id: String,
-}
-
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct RegisterRequestValue {
     email: String,
     hashed_password: String,
-}
-
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct LoginRequest {
-    email: String,
-    password: String,
-    client_id: String,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct LoginResponse {
-    access_token: String,
-    refresh_token: String,
-}
-
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct ValidateTokenRequest {
-    access_token: String,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct ValidateTokenResponse {
-    sub: String,
-    exp: usize,
-    user_id: String,
-    first_name: Option<String>,
-    last_name: Option<String>,
-    middle_name: Option<String>,
-    client_id: String,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct ValidateAPITokenResponse {
-    sub: String,
-    exp: usize,
-    scopes: Vec<String>,
-    group_id: i64,
-}
-
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct ChangePasswordRequest {
-    email: String,
-    current_password: String,
-    new_password: String,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct ChangePasswordResponse {
-    message: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, JsonSchema)]
-pub struct ResetPasswordRequest {
-    token: String,
-    new_password: String,
 }
 
 #[openapi()]
@@ -155,7 +53,7 @@ pub struct ResetPasswordRequest {
 pub fn change_password(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     change_password_request: Json<ChangePasswordRequest>,
-) -> status::Custom<Json<ChangePasswordResponse>> {
+) -> status::Custom<Json<MessageResponse>> {
     use crate::models::schema::schema::user::dsl::*;
 
     let mut conn = rdb.get().expect("Failed to get DB connection");
@@ -168,7 +66,7 @@ pub fn change_password(
         Err(_) => {
             return status::Custom(
                 Status::NotFound,
-                Json(ChangePasswordResponse {
+                Json(MessageResponse {
                     message: "User not found".to_string(),
                 }),
             )
@@ -184,7 +82,7 @@ pub fn change_password(
     if !valid {
         return status::Custom(
             Status::Unauthorized,
-            Json(ChangePasswordResponse {
+            Json(MessageResponse {
                 message: "Current password is incorrect".to_string(),
             }),
         );
@@ -201,14 +99,14 @@ pub fn change_password(
     if updated_rows > 0 {
         status::Custom(
             Status::Ok,
-            Json(ChangePasswordResponse {
+            Json(MessageResponse {
                 message: "Password updated successfully".to_string(),
             }),
         )
     } else {
         status::Custom(
             Status::InternalServerError,
-            Json(ChangePasswordResponse {
+            Json(MessageResponse {
                 message: "Failed to update password".to_string(),
             }),
         )
@@ -535,8 +433,9 @@ pub fn update_profile(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     claims: Claims,
     update_request: Json<UpdateProfileRequest>,
-) -> Result<Json<UpdateProfileResponse>, Status> {
-    let mut conn = rdb.get().map_err(|_| Status::ServiceUnavailable)?;
+) -> Result<Json<MessageResponse>, Status> {
+    let mut conn: diesel::r2d2::PooledConnection<ConnectionManager<PgConnection>> =
+        rdb.get().map_err(|_| Status::ServiceUnavailable)?;
 
     use crate::models::schema::schema::user::dsl::*;
 
@@ -553,7 +452,7 @@ pub fn update_profile(
         .map_err(|_| Status::InternalServerError)?;
 
     if updated_rows > 0 {
-        Ok(Json(UpdateProfileResponse {
+        Ok(Json(MessageResponse {
             message: "Profile updated successfully".to_string(),
         }))
     } else {
@@ -862,18 +761,6 @@ pub fn reset_password(
     }
 }
 
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct CreateApiTokenRequest {
-    pub days_to_expire: i64,
-    pub name: String,
-    pub group_identifier: String, // Changed to i64 for consistency with your schema
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct CreateApiTokenResponse {
-    pub api_token: String,
-}
-
 #[openapi]
 #[post("/create-api-token", data = "<create_request>")]
 pub fn create_api_token(
@@ -944,15 +831,6 @@ pub fn create_api_token(
         Json(CreateApiTokenResponse { api_token: token }),
     )
 }
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct LogoutRequest {
-    refresh_token: String,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct LogoutResponse {
-    message: String,
-}
 
 #[openapi()]
 #[post("/logout", data = "<logout_request>")]
@@ -961,7 +839,7 @@ pub fn logout(
     cache: &State<Pool<RedisConnectionManager>>,
     logout_request: Json<LogoutRequest>,
     claims: Claims,
-) -> Result<Json<LogoutResponse>, rocket::http::Status> {
+) -> Result<Json<MessageResponse>, rocket::http::Status> {
     use crate::models::schema::schema::token::dsl::*;
 
     let mut conn = rdb
@@ -994,19 +872,9 @@ pub fn logout(
         .del(&cache_key)
         .map_err(|_| rocket::http::Status::InternalServerError)?;
 
-    Ok(Json(LogoutResponse {
+    Ok(Json(MessageResponse {
         message: "Logged out successfully".to_string(),
     }))
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct UserInfo {
-    first_name: String,
-    last_name: String,
-    middle_name: Option<String>,
-    pk: i64,
-    is_admin: bool,
-    email_id: String,
 }
 
 #[openapi()]
@@ -1014,7 +882,7 @@ pub struct UserInfo {
 pub fn get_members(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     group_identifier: String,
-) -> Result<Json<Vec<UserInfo>>, Status> {
+) -> Result<Json<Vec<UserInfoResponse>>, Status> {
     use crate::models::schema::schema::group::dsl as group_dsl;
     use crate::models::schema::schema::group_owners::dsl as group_owners_dsl;
     use crate::models::schema::schema::group_users::dsl as group_users_dsl;
@@ -1053,10 +921,10 @@ pub fn get_members(
         .map_err(|_| Status::InternalServerError)?;
 
     // Map the user information into the UserInfo struct
-    let user_info: Vec<UserInfo> = users
+    let user_info: Vec<UserInfoResponse> = users
         .into_iter()
         .map(
-            |(first_name, last_name, middle_name, email_id, pk)| UserInfo {
+            |(first_name, last_name, middle_name, email_id, pk)| UserInfoResponse {
                 first_name: first_name.unwrap_or_default(),
                 last_name: last_name.unwrap_or_default(),
                 middle_name,
@@ -1208,16 +1076,6 @@ pub fn manage_membership(
     Ok(Json(json!({ "status": "success" })))
 }
 
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct CreateSessionTokenRequest {
-    pub api_token: String,
-}
-
-#[derive(Serialize, Deserialize, JsonSchema)]
-pub struct CreateSessionTokenResponse {
-    pub session_token: String,
-}
-
 #[openapi()]
 #[post("/create-api-session-token", data = "<request>")]
 pub fn create_api_session_token(
@@ -1321,15 +1179,6 @@ pub fn create_api_session_token_interactive(
     }))
 }
 
-/// Struct to represent the API token response
-#[derive(Serialize, JsonSchema)]
-pub struct GroupApiTokenResponse {
-    pub expiry_date: NaiveDate,
-    pub created_at: chrono::DateTime<Utc>,
-    pub is_active: bool,
-    pub name: String,
-    pub pk: i64,
-}
 #[openapi()]
 #[get("/api-tokens/<group_identifier>")]
 pub fn get_api_tokens_by_group(

@@ -1,4 +1,4 @@
-use crate::models::response::MessageResponse;
+use ginger_shared_rs::rocket_models::MessageResponse;
 use rocket::serde::json::Json;
 use rocket_okapi::openapi;
 
