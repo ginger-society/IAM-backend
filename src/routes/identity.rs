@@ -1070,21 +1070,17 @@ pub fn get_members(
     Ok(Json(user_info))
 }
 
-#[openapi()]
-#[get("/get_group_members_ids/<group_identifier>")]
-pub fn get_group_members_ids(
+fn fetch_group_members_ids(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
-    group_identifier: String,
-    _claims: APIClaims,
-) -> Result<Json<Vec<i64>>, Status> {
+    group_identifier: &str,
+) -> Result<Vec<i64>, Status> {
     use crate::models::schema::schema::group::dsl as group_dsl;
     use crate::models::schema::schema::group_users::dsl as group_users_dsl;
-
     let mut conn = rdb.get().map_err(|_| Status::ServiceUnavailable)?;
 
     // Fetch the group ID based on the identifier
     let group_id = group_dsl::group
-        .filter(group_dsl::identifier.eq(&group_identifier))
+        .filter(group_dsl::identifier.eq(group_identifier))
         .select(group_dsl::id)
         .first::<i64>(&mut conn)
         .optional()
@@ -1098,6 +1094,17 @@ pub fn get_group_members_ids(
         .load::<i64>(&mut conn)
         .map_err(|_| Status::InternalServerError)?;
 
+    Ok(user_ids)
+}
+
+#[openapi()]
+#[get("/get_group_members_ids/<group_identifier>")]
+pub fn get_group_members_ids(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    group_identifier: String,
+    _claims: APIClaims,
+) -> Result<Json<Vec<i64>>, Status> {
+    let user_ids = fetch_group_members_ids(rdb, &group_identifier)?;
     Ok(Json(user_ids))
 }
 
@@ -1108,27 +1115,7 @@ pub fn get_group_members_ids_user_land(
     group_identifier: String,
     _claims: Claims,
 ) -> Result<Json<Vec<i64>>, Status> {
-    use crate::models::schema::schema::group::dsl as group_dsl;
-    use crate::models::schema::schema::group_users::dsl as group_users_dsl;
-
-    let mut conn = rdb.get().map_err(|_| Status::ServiceUnavailable)?;
-
-    // Fetch the group ID based on the identifier
-    let group_id = group_dsl::group
-        .filter(group_dsl::identifier.eq(&group_identifier))
-        .select(group_dsl::id)
-        .first::<i64>(&mut conn)
-        .optional()
-        .map_err(|_| Status::InternalServerError)?
-        .ok_or(Status::NotFound)?;
-
-    // Fetch the user IDs associated with the group
-    let user_ids = group_users_dsl::group_users
-        .filter(group_users_dsl::group_id.eq(group_id))
-        .select(group_users_dsl::user_id)
-        .load::<i64>(&mut conn)
-        .map_err(|_| Status::InternalServerError)?;
-
+    let user_ids = fetch_group_members_ids(rdb, &group_identifier)?;
     Ok(Json(user_ids))
 }
 
