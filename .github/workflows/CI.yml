@@ -95,7 +95,7 @@ jobs:
 
       - name: Trigger dependent pipelines
         if: success()
-        run: ginger-connector trigger-dependent-pipelines ${{ secrets.GH_TOKEN }}
+        run: ginger-connector trigger-dependent-pipelines ${{ secrets.GH_TOKEN }} --pipelines-to-skip MetadataService
       
       - name: Trigger NotificationService pipeline
         if: success()
