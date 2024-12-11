@@ -18,7 +18,7 @@ use rocket::{post, State};
 use rocket_okapi::openapi;
 use serde_json::{json, Value};
 use std::env;
-use NotificationService::apis::crate_api::{send_email, SendEmailParams};
+use NotificationService::apis::default_api::{send_email, SendEmailParams};
 use NotificationService::get_configuration as get_notification_service_configuration;
 
 use NotificationService::apis::configuration::ApiKey as NotificationApiKey;
