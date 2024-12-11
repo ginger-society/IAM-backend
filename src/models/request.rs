@@ -7,6 +7,12 @@ pub struct RequestPasswordRequest {
     pub app_id: String,
 }
 
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct RegisterRequestValue {
+    pub email: String,
+    pub hashed_password: String,
+}
+
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct CreateGroupRequest {
     pub id: String,

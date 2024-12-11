@@ -1,6 +1,8 @@
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
+use diesel::pg::Pg;
 use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::sql_types::Bool;
 use diesel::{insert_into, PgConnection, RunQueryDsl};
 use diesel::{prelude::*, update};
 use ginger_shared_rs::rocket_models::MessageResponse;
@@ -14,8 +16,6 @@ use rocket::response::status;
 use rocket::serde::json::Json;
 use rocket::{post, State};
 use rocket_okapi::openapi;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::env;
 use NotificationService::apis::crate_api::{send_email, SendEmailParams};
@@ -23,10 +23,9 @@ use NotificationService::get_configuration as get_notification_service_configura
 
 use NotificationService::apis::configuration::ApiKey as NotificationApiKey;
 
-use NotificationService::models::EmailRequest;
-
 use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::groups_owned::GroupOwnerships;
+use crate::models::request::RegisterRequestValue;
 use crate::models::request::{
     ChangePasswordRequest, CreateApiTokenRequest, CreateGroupRequest, CreateSessionTokenRequest,
     LoginRequest, LogoutRequest, RefreshTokenRequest, RegisterRequest, RequestPasswordRequest,
@@ -42,11 +41,7 @@ use crate::models::schema::{
     Group_UsersInsertable, TokenInsertable, User, UserInsertable,
 };
 use rand::distributions::Alphanumeric;
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct RegisterRequestValue {
-    email: String,
-    hashed_password: String,
-}
+use NotificationService::models::EmailRequest;
 
 #[openapi()]
 #[post("/change-password", data = "<change_password_request>")]
@@ -988,10 +983,10 @@ pub fn get_group_members_ids_user_land(
 }
 
 #[openapi()]
-#[put("/manage-membership/<group_identifier>/<user_id>/<action>")]
+#[put("/manage-membership/<group_param>/<user_id>/<action>")]
 pub fn manage_membership(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
-    group_identifier: String,
+    group_param: String,
     user_id: String,
     action: String,
 ) -> Result<Json<Value>, Status> {
@@ -1002,9 +997,15 @@ pub fn manage_membership(
     use crate::models::schema::schema::group_users::dsl as group_users_dsl;
     use crate::models::schema::schema::user::dsl as user_dsl;
 
+    let group_query: Box<dyn BoxableExpression<group_dsl::group, Pg, SqlType = Bool>> =
+        if let Ok(group_id) = group_param.parse::<i64>() {
+            Box::new(group_dsl::id.eq(group_id))
+        } else {
+            Box::new(group_dsl::identifier.eq(group_param))
+        };
     // Find the group by its identifier
     let group: Group = group_dsl::group
-        .filter(group_dsl::identifier.eq(&group_identifier))
+        .filter(group_query)
         .first::<Group>(&mut conn)
         .map_err(|_| Status::NotFound)?;
 
