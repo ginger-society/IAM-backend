@@ -1,18 +1,20 @@
+dir = "."
 lang = "Rust"
 organization_id = "ginger-society"
-dir = "."
-spec_url = "/openapi.json"
 service_type = "RPCEndpoint"
+spec_url = "/openapi.json"
 
 [services."@ginger-society/NotificationService"]
-stage_k8 = "http://notification-service-service"
 stage = "https://api-staging.gingersociety.org"
+stage_k8 = "http://notification-service-service"
 
 [portals_refs]
 
 [urls]
-stage_k8 = "http://iam-service-api-service/iam"
+dev = "http://localhost:8080/iam"
 prod = "https://exampleapi.com"
 prod_k8 = "https://exampleapi.com"
-dev = "http://localhost:8080/iam"
 stage = "https://api-staging.gingersociety.org/iam"
+stage_k8 = "http://iam-service-api-service/iam"
+
+[urls_ws]
