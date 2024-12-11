@@ -873,10 +873,10 @@ pub fn logout(
 }
 
 #[openapi()]
-#[get("/get_members/<group_identifier>")]
+#[get("/get_members/<group_param>")]
 pub fn get_members(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
-    group_identifier: String,
+    group_param: String,
 ) -> Result<Json<Vec<UserInfoResponse>>, Status> {
     use crate::models::schema::schema::group::dsl as group_dsl;
     use crate::models::schema::schema::group_owners::dsl as group_owners_dsl;
@@ -885,9 +885,17 @@ pub fn get_members(
 
     let mut conn = rdb.get().map_err(|_| Status::ServiceUnavailable)?;
 
-    // Fetch the group ID based on the identifier
+    // Determine if `group_param` is an ID or an identifier
+    let group_query: Box<dyn BoxableExpression<group_dsl::group, Pg, SqlType = Bool>> =
+        if let Ok(group_id) = group_param.parse::<i64>() {
+            Box::new(group_dsl::id.eq(group_id))
+        } else {
+            Box::new(group_dsl::identifier.eq(group_param))
+        };
+
+    // Fetch the group ID using the dynamic query
     let group_id = group_dsl::group
-        .filter(group_dsl::identifier.eq(&group_identifier))
+        .filter(group_query)
         .select(group_dsl::id)
         .first::<i64>(&mut conn)
         .optional()
