@@ -42,7 +42,7 @@ pub struct RegisterRequest {
 pub struct LoginRequest {
     pub email: String,
     pub password: String,
-    pub client_id: String,
+    pub client_id: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]

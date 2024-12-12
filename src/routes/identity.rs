@@ -235,6 +235,7 @@ pub fn registeration_confirmation(
 
     Ok(Json("User registered successfully".to_string()))
 }
+
 #[openapi()]
 #[post("/login", data = "<login_request>")]
 pub fn login(
@@ -242,8 +243,8 @@ pub fn login(
     login_request: Json<LoginRequest>,
     cache_pool: &State<Pool<RedisConnectionManager>>,
 ) -> Result<Json<LoginResponse>, rocket::http::Status> {
-    use crate::models::schema::schema::app::dsl::*;
     use crate::models::schema::schema::user::dsl::*;
+    use bcrypt::verify;
 
     let mut conn = rdb
         .get()
@@ -284,16 +285,22 @@ pub fn login(
             &login_request.client_id,
         );
 
-        // Fetch the app using client_id
-        let a: App = app
-            .filter(client_id.eq(&login_request.client_id))
-            .first(&mut conn)
-            .map_err(|_| rocket::http::Status::Unauthorized)?;
+        // Determine app_id for Redis cache
+        let app_id = if let Some(client_id) = &login_request.client_id {
+            // Fetch app by client_id
+            use crate::models::schema::schema::app::dsl::*;
+            app.filter(client_id.eq(client_id))
+                .select(id)
+                .first::<i64>(&mut conn)
+                .ok()
+        } else {
+            None
+        };
 
-        // Store session data as JSON in Redis
+        // Store session data in Redis
         let session_data = json!({
             "user_id": u.id,
-            "app_id": a.id,
+            "app_id": app_id, // `null` if no client_id provided
         });
         let _: () = cache_connection
             .set_ex(refresh_token.clone(), session_data.to_string(), 3600) // Token expires in 1 hour
@@ -309,6 +316,7 @@ pub fn login(
         Err(rocket::http::Status::Unauthorized)
     }
 }
+
 #[openapi()]
 #[post("/refresh-token", data = "<refresh_request>")]
 pub fn refresh_token(
@@ -393,7 +401,7 @@ fn create_jwt(
     f_name: &Option<String>,
     l_name: &Option<String>,
     m_name: &Option<String>,
-    c_id: &String,
+    c_id: &Option<String>,
 ) -> String {
     let expiration = match token_type {
         "access" => Utc::now() + Duration::minutes(15), // Short-lived access token

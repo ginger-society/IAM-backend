@@ -1023,9 +1023,9 @@ checksum = "40ecd4077b5ae9fd2e9e169b102c6c330d0605168eb0e8bf79952b256dbefffd"
 
 [[package]]
 name = "ginger-shared-rs"
-version = "0.34.0-nightly.0"
+version = "0.38.0-nightly.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2940e90f0ff20e8782c9f5a735ec6f7d0267348e4070971b7093caac8f2fe95"
+checksum = "1734b81fe42a9443b3c7c3d3bf77b08ecac9ba775d1931b9464cb6ab9ce00c7b"
 dependencies = [
  "clap",
  "dirs",

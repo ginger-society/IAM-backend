@@ -31,7 +31,7 @@ pub struct ValidateTokenResponse {
     pub first_name: Option<String>,
     pub last_name: Option<String>,
     pub middle_name: Option<String>,
-    pub client_id: String,
+    pub client_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
