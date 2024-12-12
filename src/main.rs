@@ -53,7 +53,8 @@ fn rocket() -> Rocket<Build> {
                 identity::clear_redis,
                 identity::get_group_members_ids,
                 identity::get_group_members_ids_user_land,
-                identity::registeration_confirmation
+                identity::registeration_confirmation,
+                identity::accept_invite
             ],
         )
         .mount(

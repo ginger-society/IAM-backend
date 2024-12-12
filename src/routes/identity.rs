@@ -25,7 +25,7 @@ use NotificationService::apis::configuration::ApiKey as NotificationApiKey;
 
 use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::groups_owned::GroupOwnerships;
-use crate::models::request::RegisterRequestValue;
+use crate::models::request::{AcceptInviteRequest, InviteRequest, RegisterRequestValue};
 use crate::models::request::{
     ChangePasswordRequest, CreateApiTokenRequest, CreateGroupRequest, CreateSessionTokenRequest,
     LoginRequest, LogoutRequest, RefreshTokenRequest, RegisterRequest, RequestPasswordRequest,
@@ -1255,4 +1255,61 @@ pub fn deactivate_api_token(
     Ok(Json(MessageResponse {
         message: format!("API token with id '{}' has been deactivated", token_id),
     }))
+}
+
+#[openapi()]
+#[post("/accept-invite/<invitation_token>", data = "<accept_request>")]
+pub fn accept_invite(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    cache: &State<Pool<RedisConnectionManager>>,
+    invitation_token: String,
+    accept_request: Json<AcceptInviteRequest>,
+) -> Result<Json<String>, Status> {
+    use crate::models::schema::schema::user::dsl::*;
+
+    let mut conn = rdb.get().expect("Failed to get DB connection");
+
+    let mut cache_connection = cache
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    // Get invitation data from cache using the token
+    let invite_data: String = cache_connection
+        .get(&invitation_token)
+        .map_err(|_| rocket::http::Status::NotFound)?;
+
+    // Remove the token from cache after reading
+    cache_connection
+        .del(&invitation_token)
+        .map_err(|_| Status::InternalServerError)?;
+
+    // Deserialize the invitation data
+    let invite_request: InviteRequest = serde_json::from_str(&invite_data).unwrap();
+
+    // Hash the provided password
+    let hashed_password = bcrypt::hash(&accept_request.password, bcrypt::DEFAULT_COST)
+        .map_err(|_| Status::InternalServerError)?;
+
+    // Create a new user in the database
+    let new_user = UserInsertable {
+        first_name: Some(invite_request.first_name),
+        last_name: Some(invite_request.last_name),
+        middle_name: invite_request.middle_name,
+        email_id: invite_request.email,
+        mobile_number: None,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        password_hash: Some(hashed_password),
+        is_root: invite_request.is_root,
+        is_active: true,
+    };
+
+    insert_into(user)
+        .values(&new_user)
+        .execute(&mut conn)
+        .map_err(|_| Status::InternalServerError)?;
+
+    Ok(Json(
+        "Invitation accepted, user registered successfully".to_string(),
+    ))
 }

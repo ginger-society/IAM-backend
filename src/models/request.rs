@@ -79,3 +79,17 @@ pub struct LogoutRequest {
 pub struct CreateSessionTokenRequest {
     pub api_token: String,
 }
+
+#[derive(Deserialize, JsonSchema)]
+pub struct AcceptInviteRequest {
+    pub password: String,
+}
+
+#[derive(Deserialize)]
+pub struct InviteRequest {
+    pub first_name: String,
+    pub last_name: String,
+    pub middle_name: Option<String>,
+    pub email: String,
+    pub is_root: bool,
+}
