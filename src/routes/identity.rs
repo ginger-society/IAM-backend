@@ -234,28 +234,36 @@ pub fn registeration_confirmation(
 
     Ok(Json("User registered successfully".to_string()))
 }
-
 #[openapi()]
 #[post("/login", data = "<login_request>")]
 pub fn login(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     login_request: Json<LoginRequest>,
-) -> Json<LoginResponse> {
+    cache_pool: &State<Pool<RedisConnectionManager>>,
+) -> Result<Json<LoginResponse>, rocket::http::Status> {
     use crate::models::schema::schema::app::dsl::*;
-    use crate::models::schema::schema::token::dsl::*;
     use crate::models::schema::schema::user::dsl::*;
 
-    let mut conn = rdb.get().expect("Failed to get DB connection");
+    let mut conn = rdb
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
 
+    let mut cache_connection = cache_pool
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    // Fetch the user by email
     let u: User = user
         .filter(email_id.eq(&login_request.email))
         .first(&mut conn)
-        .expect("Error getting user");
+        .map_err(|_| rocket::http::Status::Unauthorized)?;
 
+    // Verify the password
     let valid = verify(&login_request.password, u.password_hash.as_ref().unwrap())
-        .expect("Failed to verify password");
+        .map_err(|_| rocket::http::Status::Unauthorized)?;
 
     if valid {
+        // Create JWT tokens
         let access_token = create_jwt(
             &u.email_id,
             &u.id.to_string(),
@@ -275,78 +283,65 @@ pub fn login(
             &login_request.client_id,
         );
 
+        // Fetch the app using client_id
         let a: App = app
             .filter(client_id.eq(&login_request.client_id))
             .first(&mut conn)
-            .expect("App not found");
+            .map_err(|_| rocket::http::Status::Unauthorized)?;
 
-        insert_into(token)
-            .values(TokenInsertable {
-                session_hash: Some(refresh_token.clone()),
-                user_id: u.id,
-                app_id: Some(a.id),
-            })
-            .execute(&mut conn)
-            .expect("Error inserting token");
+        // Store session data as JSON in Redis
+        let session_data = json!({
+            "user_id": u.id,
+            "app_id": a.id,
+        });
+        let _: () = cache_connection
+            .set_ex(refresh_token.clone(), session_data.to_string(), 3600) // Token expires in 1 hour
+            .map_err(|_| rocket::http::Status::InternalServerError)?;
 
-        Json(LoginResponse {
+        // Return tokens in the response
+        Ok(Json(LoginResponse {
             access_token,
             refresh_token,
-        })
+        }))
     } else {
-        Json(LoginResponse {
-            access_token: "".to_string(),
-            refresh_token: "".to_string(),
-        })
+        // Respond with Unauthorized status if password is invalid
+        Err(rocket::http::Status::Unauthorized)
     }
 }
-
 #[openapi()]
 #[post("/refresh-token", data = "<refresh_request>")]
 pub fn refresh_token(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     refresh_request: Json<RefreshTokenRequest>,
-    claims: Claims,
-) -> Json<RefreshTokenResponse> {
-    use crate::models::schema::schema::token::dsl::*;
-
-    let mut conn = rdb.get().expect("Failed to get DB connection");
+    cache_pool: &State<Pool<RedisConnectionManager>>,
+) -> Result<Json<RefreshTokenResponse>, rocket::http::Status> {
+    let mut cache_connection = cache_pool
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
 
     // Decode the refresh token
     let secret = env::var("JWT_SECRET").expect("JWT_SECRET must be set");
     let decoding_key = DecodingKey::from_secret(secret.as_ref());
 
-    let token_data = match decode::<Claims>(
+    let token_data = decode::<Claims>(
         &refresh_request.refresh_token,
         &decoding_key,
         &Validation::new(Algorithm::HS256),
-    ) {
-        Ok(data) => data,
-        Err(_) => {
-            return Json(RefreshTokenResponse {
-                access_token: "".to_string(),
-            })
-        }
-    };
+    )
+    .map_err(|_| rocket::http::Status::Unauthorized)?;
 
     // Verify the token type
     if token_data.claims.token_type != "refresh" {
-        return Json(RefreshTokenResponse {
-            access_token: "".to_string(),
-        });
+        return Err(rocket::http::Status::Unauthorized);
     }
 
-    // Verify if the refresh token exists in the database
-    let refresh_token_exists: bool = token
-        .filter(session_hash.eq(&refresh_request.refresh_token))
-        .filter(user_id.eq(token_data.claims.user_id.parse::<i64>().unwrap()))
-        .execute(&mut conn)
-        .is_ok();
+    // Verify if the refresh token exists in Redis
+    let refresh_token_exists: bool = cache_connection
+        .exists(&refresh_request.refresh_token)
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
 
     if !refresh_token_exists {
-        return Json(RefreshTokenResponse {
-            access_token: "".to_string(),
-        });
+        return Err(rocket::http::Status::Unauthorized);
     }
 
     // Generate a new access token
@@ -360,8 +355,9 @@ pub fn refresh_token(
         &token_data.claims.client_id,
     );
 
-    Json(RefreshTokenResponse { access_token })
+    Ok(Json(RefreshTokenResponse { access_token }))
 }
+
 #[openapi()]
 #[get("/validate")]
 pub fn validate_token(claims: Claims) -> Result<Json<ValidateTokenResponse>, rocket::http::Status> {
@@ -678,7 +674,7 @@ pub async fn request_password_reset(
     println!("{:?}", token_value);
     // Insert the token into the database
     let _: () = cache_connection
-        .set_ex(&token_value, u.id, 300) // Token expires in 1 hour
+        .set_ex(&token_value, u.id, 300) // Token expires in 5 minutes
         .map_err(|_| rocket::http::Status::InternalServerError)?;
 
     let mut configuration = get_notification_service_configuration();
