@@ -1,3 +1,4 @@
+use crate::models::response::AccessibleApp;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use diesel::pg::Pg;
@@ -18,10 +19,9 @@ use rocket::{post, State};
 use rocket_okapi::openapi;
 use serde_json::{json, Value};
 use std::env;
+use NotificationService::apis::configuration::ApiKey as NotificationApiKey;
 use NotificationService::apis::default_api::{send_email, SendEmailParams};
 use NotificationService::get_configuration as get_notification_service_configuration;
-
-use NotificationService::apis::configuration::ApiKey as NotificationApiKey;
 
 use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::groups_owned::GroupOwnerships;
@@ -491,7 +491,7 @@ pub fn get_app_by_client_id(
 }
 
 #[openapi]
-#[get("/group-ownerships")]
+#[get("/group-memberships")]
 pub fn get_group_memberships(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     claims: Claims,
@@ -501,7 +501,7 @@ pub fn get_group_memberships(
 }
 
 #[openapi]
-#[get("/group-memberships")]
+#[get("/group-ownerships")]
 pub fn get_group_ownserships(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     claims: Claims,
@@ -1320,4 +1320,57 @@ pub fn accept_invite(
     Ok(Json(
         "Invitation accepted, user registered successfully".to_string(),
     ))
+}
+
+#[openapi]
+#[get("/accessible-apps")]
+pub fn get_accessible_apps(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    claims: Claims,
+    groups: GroupMemberships,
+) -> Result<Json<Vec<AccessibleApp>>, rocket::http::Status> {
+    use crate::models::schema::schema::app::dsl as app_dsl;
+    use crate::models::schema::schema::group::dsl as group_dsl;
+
+    let mut conn = rdb
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    // Fetch all apps and join with groups for access evaluation
+    let apps_with_groups = app_dsl::app
+        .left_join(group_dsl::group.on(group_dsl::id.nullable().eq(app_dsl::group_id)))
+        .select((
+            app_dsl::name,
+            app_dsl::logo_url,
+            app_dsl::allow_registration,
+            app_dsl::tnc_link,
+            group_dsl::identifier.nullable(),
+        ))
+        .load::<(String, Option<String>, bool, Option<String>, Option<String>)>(&mut conn)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    // Group memberships from the user's claims
+    let user_groups: Vec<String> = groups.0;
+
+    // Filter apps the user has access to
+    let accessible_apps: Vec<AccessibleApp> = apps_with_groups
+        .into_iter()
+        .filter_map(
+            |(app_name, app_logo, app_allow_reg, app_tnc_link, group_identifier)| {
+                // Public apps (no group restriction)
+                if group_identifier.is_none() || user_groups.contains(&group_identifier.unwrap()) {
+                    Some(AccessibleApp {
+                        name: app_name,
+                        logo_url: app_logo,
+                        allow_registration: app_allow_reg,
+                        tnc_link: app_tnc_link,
+                    })
+                } else {
+                    None
+                }
+            },
+        )
+        .collect();
+
+    Ok(Json(accessible_apps))
 }

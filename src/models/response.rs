@@ -71,3 +71,11 @@ pub struct GroupApiTokenResponse {
     pub name: String,
     pub pk: i64,
 }
+
+#[derive(Serialize, JsonSchema)]
+pub struct AccessibleApp {
+    pub name: String,
+    pub logo_url: Option<String>,
+    pub allow_registration: bool,
+    pub tnc_link: Option<String>,
+}

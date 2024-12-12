@@ -54,7 +54,8 @@ fn rocket() -> Rocket<Build> {
                 identity::get_group_members_ids,
                 identity::get_group_members_ids_user_land,
                 identity::registeration_confirmation,
-                identity::accept_invite
+                identity::accept_invite,
+                identity::get_accessible_apps
             ],
         )
         .mount(
