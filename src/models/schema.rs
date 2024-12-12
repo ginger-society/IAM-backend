@@ -31,17 +31,7 @@ pub mod schema {
             #[max_length = 400]
             password_hash ->Nullable<Varchar>,
             is_root ->Bool,
-            id ->BigInt,
-            
-        }
-    }
-    
-    table! {
-        token (id) {
-            #[max_length = 400]
-            session_hash ->Nullable<Varchar>,
-            user_id ->BigInt,
-            app_id ->Nullable<BigInt>,
+            is_active ->Bool,
             id ->BigInt,
             
         }
@@ -120,8 +110,6 @@ pub mod schema {
     
         
     
-        diesel::joinable!(token -> user (user_id));diesel::joinable!(token -> app (app_id));
-    
         diesel::joinable!(app -> group (group_id));
     
         diesel::joinable!(group_users -> user (user_id));diesel::joinable!(group_owners -> user (user_id));
@@ -135,7 +123,6 @@ pub mod schema {
 
     diesel::allow_tables_to_appear_in_same_query!(
         user,
-        token,
         app,
         group,
         group_users,
@@ -145,7 +132,7 @@ pub mod schema {
     );
 }
 
-use schema::{ user,token,app,group,group_users,group_owners,api_token, };
+use schema::{ user,app,group,group_users,group_owners,api_token, };
 
 
 
@@ -163,19 +150,7 @@ pub struct User {
     pub updated_at:DateTime<Utc>,
     pub password_hash:Option<String>,
     pub is_root:bool,
-    pub id:i64,
-    
-}
-
-
-#[derive(Queryable, Debug, Clone, Selectable, Serialize, Deserialize, JsonSchema,Identifiable,Associations)]
-#[diesel(belongs_to(User, foreign_key = user_id))]#[diesel(belongs_to(App, foreign_key = app_id))]
-#[diesel(check_for_backend(diesel::pg::Pg))]
-#[diesel(table_name = token)]
-pub struct Token {
-    pub session_hash:Option<String>,
-    pub user_id:i64,
-    pub app_id:Option<i64>,
+    pub is_active:bool,
     pub id:i64,
     
 }
@@ -271,18 +246,7 @@ pub struct UserInsertable {
     pub updated_at:DateTime<Utc>,
     pub password_hash:Option<String>,
     pub is_root:bool,
-    
-}
-
-
-#[derive(Queryable, Debug, Clone, Selectable, Serialize, Deserialize, Insertable, JsonSchema,Associations)]
-#[diesel(belongs_to(User, foreign_key = user_id))]#[diesel(belongs_to(App, foreign_key = app_id))]
-#[diesel(check_for_backend(diesel::pg::Pg))]
-#[diesel(table_name = token)]
-pub struct TokenInsertable {
-    pub session_hash:Option<String>,
-    pub user_id:i64,
-    pub app_id:Option<i64>,
+    pub is_active:bool,
     
 }
 

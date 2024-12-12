@@ -38,7 +38,7 @@ use crate::models::response::{
 };
 use crate::models::schema::{
     Api_Token, Api_TokenInsertable, App, Group, GroupInsertable, Group_OwnersInsertable,
-    Group_UsersInsertable, TokenInsertable, User, UserInsertable,
+    Group_UsersInsertable, User, UserInsertable,
 };
 use rand::distributions::Alphanumeric;
 use NotificationService::models::EmailRequest;
@@ -225,6 +225,7 @@ pub fn registeration_confirmation(
         updated_at: Utc::now(),
         password_hash: Some(register_request.hashed_password),
         is_root: false,
+        is_active: true,
     };
 
     insert_into(user)
@@ -822,45 +823,30 @@ pub fn create_api_token(
         Json(CreateApiTokenResponse { api_token: token }),
     )
 }
-
 #[openapi()]
 #[post("/logout", data = "<logout_request>")]
 pub fn logout(
-    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     cache: &State<Pool<RedisConnectionManager>>,
     logout_request: Json<LogoutRequest>,
     claims: Claims,
 ) -> Result<Json<MessageResponse>, rocket::http::Status> {
-    use crate::models::schema::schema::token::dsl::*;
-
-    let mut conn = rdb
-        .get()
-        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
-
     let mut cache_connection = cache
         .get()
         .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
 
-    // Verify if the refresh token exists in the database
-    let refresh_token_exists: bool = token
-        .filter(session_hash.eq(&logout_request.refresh_token))
-        .filter(user_id.eq(claims.user_id.parse::<i64>().unwrap()))
-        .execute(&mut conn)
-        .is_ok();
+    // Verify if the refresh token exists in Redis
+    let refresh_token_key = logout_request.refresh_token.clone();
+    let refresh_token_exists: bool = cache_connection
+        .exists(&refresh_token_key)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
 
     if !refresh_token_exists {
         return Err(rocket::http::Status::Unauthorized);
     }
 
-    // Delete the refresh token from the database
-    diesel::delete(token.filter(session_hash.eq(&logout_request.refresh_token)))
-        .execute(&mut conn)
-        .map_err(|_| rocket::http::Status::InternalServerError)?;
-
-    // Clear the Redis cache related to the user session
-    let cache_key = format!("user_session:{}", claims.user_id);
+    // Remove the refresh token from Redis
     let _: () = cache_connection
-        .del(&cache_key)
+        .del(&refresh_token_key)
         .map_err(|_| rocket::http::Status::InternalServerError)?;
 
     Ok(Json(MessageResponse {

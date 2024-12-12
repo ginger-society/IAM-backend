@@ -8,4 +8,4 @@ cache_schema_id = "a3f5e631-8225-4ac5-85b9-71ecd107bb6c"
 branch = "main"
 
 [tables]
-names = ["user", "token", "app", "group", "api_token"]
+names = ["user", "app", "group", "api_token"]
