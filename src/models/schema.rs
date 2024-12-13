@@ -60,6 +60,7 @@ pub mod schema {
             description ->Nullable<Varchar>,
             #[max_length = 100]
             auth_redirection_path ->Nullable<Varchar>,
+            web_interface ->Bool,
             id ->BigInt,
             
         }
@@ -177,6 +178,7 @@ pub struct App {
     pub allow_registration:bool,
     pub description:Option<String>,
     pub auth_redirection_path:Option<String>,
+    pub web_interface:bool,
     pub id:i64,
     
 }
@@ -274,6 +276,7 @@ pub struct AppInsertable {
     pub allow_registration:bool,
     pub description:Option<String>,
     pub auth_redirection_path:Option<String>,
+    pub web_interface:bool,
     
 }
 

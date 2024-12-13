@@ -84,4 +84,5 @@ pub struct AccessibleApp {
     pub app_url_stage: Option<String>,
     pub app_url_prod: Option<String>,
     pub redirection_path: Option<String>,
+    pub has_web_interface: bool,
 }

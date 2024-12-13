@@ -1350,6 +1350,7 @@ pub fn get_accessible_apps(
             app_dsl::app_url_prod,
             app_dsl::description,
             app_dsl::auth_redirection_path,
+            app_dsl::web_interface,
             group_dsl::identifier.nullable(),
         ))
         .load::<(
@@ -1362,6 +1363,7 @@ pub fn get_accessible_apps(
             Option<String>,
             Option<String>,
             Option<String>,
+            bool,
             Option<String>,
         )>(&mut conn)
         .map_err(|_| rocket::http::Status::InternalServerError)?;
@@ -1383,6 +1385,7 @@ pub fn get_accessible_apps(
                 app_prod_url,
                 app_description,
                 redirection_path,
+                has_web_interface,
                 group_identifier,
             )| {
                 // Public apps (no group restriction)
@@ -1397,6 +1400,7 @@ pub fn get_accessible_apps(
                         app_url_stage: app_stage_url,
                         app_url_prod: app_prod_url,
                         redirection_path: redirection_path,
+                        has_web_interface: has_web_interface,
                     })
                 } else {
                     None
