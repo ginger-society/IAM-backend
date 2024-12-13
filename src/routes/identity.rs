@@ -235,7 +235,6 @@ pub fn registeration_confirmation(
 
     Ok(Json("User registered successfully".to_string()))
 }
-
 #[openapi()]
 #[post("/login", data = "<login_request>")]
 pub fn login(
@@ -278,25 +277,48 @@ pub fn login(
             None
         };
 
-        // Create tokens with app_id
-        let access_token_with_app = create_jwt(
-            &u.email_id,
-            &u.id.to_string(),
-            "access",
-            &u.first_name,
-            &u.last_name,
-            &u.middle_name,
-            &app_id.clone(),
-        );
-        let refresh_token_with_app = create_jwt(
-            &u.email_id,
-            &u.id.to_string(),
-            "refresh",
-            &u.first_name,
-            &u.last_name,
-            &u.middle_name,
-            &app_id.clone(),
-        );
+        // Create tokens with app_id if provided
+        let app_tokens = if let Some(app_id) = &app_id {
+            // Create tokens with app_id
+            let access_token = create_jwt(
+                &u.email_id,
+                &u.id.to_string(),
+                "access",
+                &u.first_name,
+                &u.last_name,
+                &u.middle_name,
+                &Some(app_id.clone()),
+            );
+            let refresh_token = create_jwt(
+                &u.email_id,
+                &u.id.to_string(),
+                "refresh",
+                &u.first_name,
+                &u.last_name,
+                &u.middle_name,
+                &Some(app_id.clone()),
+            );
+
+            // Store the refresh token with app_id in Redis
+            let session_data_with_app = json!({
+                "user_id": u.id,
+                "app_id": app_id,
+            });
+            let _: () = cache_connection
+                .set_ex(
+                    refresh_token.clone(),
+                    session_data_with_app.to_string(),
+                    3600, // Token expires in 1 hour
+                )
+                .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+            Some(LoginResponse {
+                access_token,
+                refresh_token,
+            })
+        } else {
+            None
+        };
 
         // Create tokens without app_id
         let access_token_without_app = create_jwt(
@@ -318,21 +340,6 @@ pub fn login(
             &None,
         );
 
-        // Store the refresh token with app_id in Redis
-        if let Some(app_id) = &app_id {
-            let session_data_with_app = json!({
-                "user_id": u.id,
-                "app_id": app_id,
-            });
-            let _: () = cache_connection
-                .set_ex(
-                    refresh_token_with_app.clone(),
-                    session_data_with_app.to_string(),
-                    3600, // Token expires in 1 hour
-                )
-                .map_err(|_| rocket::http::Status::InternalServerError)?;
-        }
-
         // Store the refresh token without app_id in Redis
         let session_data_without_app = json!({
             "user_id": u.id,
@@ -345,12 +352,9 @@ pub fn login(
             )
             .map_err(|_| rocket::http::Status::InternalServerError)?;
 
-        // Return both sets of tokens
+        // Return tokens
         Ok(Json(IAMLoginResponse {
-            app_tokens: LoginResponse {
-                access_token: access_token_with_app,
-                refresh_token: refresh_token_with_app,
-            },
+            app_tokens,
             iam_tokens: LoginResponse {
                 access_token: access_token_without_app,
                 refresh_token: refresh_token_without_app,

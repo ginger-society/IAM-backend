@@ -89,6 +89,6 @@ pub struct AccessibleApp {
 
 #[derive(Serialize, JsonSchema)]
 pub struct IAMLoginResponse {
-    pub app_tokens: LoginResponse,
+    pub app_tokens: Option<LoginResponse>,
     pub iam_tokens: LoginResponse,
 }
