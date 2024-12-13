@@ -56,6 +56,8 @@ pub mod schema {
             #[max_length = 500]
             tnc_link ->Nullable<Varchar>,
             allow_registration ->Bool,
+            #[max_length = 2000]
+            description ->Nullable<Varchar>,
             id ->BigInt,
             
         }
@@ -171,6 +173,7 @@ pub struct App {
     pub group_id:Option<i64>,
     pub tnc_link:Option<String>,
     pub allow_registration:bool,
+    pub description:Option<String>,
     pub id:i64,
     
 }
@@ -266,6 +269,7 @@ pub struct AppInsertable {
     pub group_id:Option<i64>,
     pub tnc_link:Option<String>,
     pub allow_registration:bool,
+    pub description:Option<String>,
     
 }
 

@@ -1344,9 +1344,23 @@ pub fn get_accessible_apps(
             app_dsl::logo_url,
             app_dsl::allow_registration,
             app_dsl::tnc_link,
+            app_dsl::app_url_dev,
+            app_dsl::app_url_stage,
+            app_dsl::app_url_prod,
+            app_dsl::description,
             group_dsl::identifier.nullable(),
         ))
-        .load::<(String, Option<String>, bool, Option<String>, Option<String>)>(&mut conn)
+        .load::<(
+            String,
+            Option<String>,
+            bool,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )>(&mut conn)
         .map_err(|_| rocket::http::Status::InternalServerError)?;
 
     // Group memberships from the user's claims
@@ -1356,7 +1370,17 @@ pub fn get_accessible_apps(
     let accessible_apps: Vec<AccessibleApp> = apps_with_groups
         .into_iter()
         .filter_map(
-            |(app_name, app_logo, app_allow_reg, app_tnc_link, group_identifier)| {
+            |(
+                app_name,
+                app_logo,
+                app_allow_reg,
+                app_tnc_link,
+                app_dev_url,
+                app_stage_url,
+                app_prod_url,
+                app_description,
+                group_identifier,
+            )| {
                 // Public apps (no group restriction)
                 if group_identifier.is_none() || user_groups.contains(&group_identifier.unwrap()) {
                     Some(AccessibleApp {
@@ -1364,6 +1388,10 @@ pub fn get_accessible_apps(
                         logo_url: app_logo,
                         allow_registration: app_allow_reg,
                         tnc_link: app_tnc_link,
+                        description: app_description,
+                        app_url_dev: app_dev_url,
+                        app_url_stage: app_stage_url,
+                        app_url_prod: app_prod_url,
                     })
                 } else {
                     None

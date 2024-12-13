@@ -78,4 +78,8 @@ pub struct AccessibleApp {
     pub logo_url: Option<String>,
     pub allow_registration: bool,
     pub tnc_link: Option<String>,
+    pub description: Option<String>,
+    pub app_url_dev: Option<String>,
+    pub app_url_stage: Option<String>,
+    pub app_url_prod: Option<String>,
 }
