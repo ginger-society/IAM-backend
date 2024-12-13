@@ -10,6 +10,7 @@ pub struct AppResponse {
     pub app_url_prod: Option<String>,
     pub tnc_link: Option<String>,
     pub allow_registration: bool,
+    pub redirection_path: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
@@ -82,4 +83,5 @@ pub struct AccessibleApp {
     pub app_url_dev: Option<String>,
     pub app_url_stage: Option<String>,
     pub app_url_prod: Option<String>,
+    pub redirection_path: Option<String>,
 }

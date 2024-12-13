@@ -485,6 +485,7 @@ pub fn get_app_by_client_id(
             app_url_prod: a.app_url_prod,
             tnc_link: a.tnc_link,
             allow_registration: a.allow_registration,
+            redirection_path: a.auth_redirection_path,
         })),
         Err(_) => Err(rocket::http::Status::NotFound),
     }
@@ -1348,12 +1349,14 @@ pub fn get_accessible_apps(
             app_dsl::app_url_stage,
             app_dsl::app_url_prod,
             app_dsl::description,
+            app_dsl::auth_redirection_path,
             group_dsl::identifier.nullable(),
         ))
         .load::<(
             String,
             Option<String>,
             bool,
+            Option<String>,
             Option<String>,
             Option<String>,
             Option<String>,
@@ -1379,6 +1382,7 @@ pub fn get_accessible_apps(
                 app_stage_url,
                 app_prod_url,
                 app_description,
+                redirection_path,
                 group_identifier,
             )| {
                 // Public apps (no group restriction)
@@ -1392,6 +1396,7 @@ pub fn get_accessible_apps(
                         app_url_dev: app_dev_url,
                         app_url_stage: app_stage_url,
                         app_url_prod: app_prod_url,
+                        redirection_path: redirection_path,
                     })
                 } else {
                     None

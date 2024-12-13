@@ -58,6 +58,8 @@ pub mod schema {
             allow_registration ->Bool,
             #[max_length = 2000]
             description ->Nullable<Varchar>,
+            #[max_length = 100]
+            auth_redirection_path ->Nullable<Varchar>,
             id ->BigInt,
             
         }
@@ -174,6 +176,7 @@ pub struct App {
     pub tnc_link:Option<String>,
     pub allow_registration:bool,
     pub description:Option<String>,
+    pub auth_redirection_path:Option<String>,
     pub id:i64,
     
 }
@@ -270,6 +273,7 @@ pub struct AppInsertable {
     pub tnc_link:Option<String>,
     pub allow_registration:bool,
     pub description:Option<String>,
+    pub auth_redirection_path:Option<String>,
     
 }
 
