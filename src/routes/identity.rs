@@ -1407,3 +1407,72 @@ pub fn get_accessible_apps(
 
     Ok(Json(accessible_apps))
 }
+
+#[openapi()]
+#[post("/generate-app-tokens/<app_id>")]
+pub fn generate_app_tokens(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    cache_pool: &State<Pool<RedisConnectionManager>>,
+    app_id: String,
+    claims: Claims,
+) -> Result<Json<LoginResponse>, rocket::http::Status> {
+    use crate::models::schema::schema::app::dsl as app_dsl;
+
+    let mut conn = rdb
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    let mut cache_connection = cache_pool
+        .get()
+        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+
+    // Validate the app_id exists
+    let app_exists = app_dsl::app
+        .filter(app_dsl::client_id.eq(&app_id)) // Assuming client_id is a string column in the app table
+        .select(app_dsl::id)
+        .first::<i64>(&mut conn)
+        .is_ok();
+
+    if !app_exists {
+        return Err(rocket::http::Status::BadRequest);
+    }
+
+    // Generate new tokens
+    let access_token = create_jwt(
+        &claims.sub,
+        &claims.user_id,
+        "access",
+        &claims.first_name,
+        &claims.last_name,
+        &claims.middle_name,
+        &Some(app_id.clone()),
+    );
+    let refresh_token = create_jwt(
+        &claims.sub,
+        &claims.user_id,
+        "refresh",
+        &claims.first_name,
+        &claims.last_name,
+        &claims.middle_name,
+        &Some(app_id.clone()),
+    );
+
+    // Store the new refresh token in Redis
+    let session_data = json!({
+        "user_id": claims.user_id,
+        "app_id": app_id,
+    });
+    let _: () = cache_connection
+        .set_ex(
+            refresh_token.clone(),
+            session_data.to_string(),
+            3600, // Token expires in 1 hour
+        )
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    // Return the new tokens
+    Ok(Json(LoginResponse {
+        access_token,
+        refresh_token,
+    }))
+}
