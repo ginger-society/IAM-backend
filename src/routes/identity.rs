@@ -1,4 +1,4 @@
-use crate::models::response::AccessibleApp;
+use crate::models::response::{AccessibleApp, IAMLoginResponse};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use diesel::pg::Pg;
@@ -242,7 +242,7 @@ pub fn login(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     login_request: Json<LoginRequest>,
     cache_pool: &State<Pool<RedisConnectionManager>>,
-) -> Result<Json<LoginResponse>, rocket::http::Status> {
+) -> Result<Json<IAMLoginResponse>, rocket::http::Status> {
     use crate::models::schema::schema::user::dsl::*;
     use bcrypt::verify;
 
@@ -265,51 +265,96 @@ pub fn login(
         .map_err(|_| rocket::http::Status::Unauthorized)?;
 
     if valid {
-        // Create JWT tokens
-        let access_token = create_jwt(
+        // Determine app_id for Redis cache
+        let app_id = if let Some(app_id) = &login_request.client_id {
+            // Fetch app by client_id
+            use crate::models::schema::schema::app::dsl::*;
+            app.filter(client_id.eq(app_id))
+                .select(id)
+                .first::<i64>(&mut conn)
+                .ok()
+                .map(|app_pk| app_pk.to_string()) // Convert app_id to String
+        } else {
+            None
+        };
+
+        // Create tokens with app_id
+        let access_token_with_app = create_jwt(
             &u.email_id,
             &u.id.to_string(),
             "access",
             &u.first_name,
             &u.last_name,
             &u.middle_name,
-            &login_request.client_id,
+            &app_id.clone(),
         );
-        let refresh_token = create_jwt(
+        let refresh_token_with_app = create_jwt(
             &u.email_id,
             &u.id.to_string(),
             "refresh",
             &u.first_name,
             &u.last_name,
             &u.middle_name,
-            &login_request.client_id,
+            &app_id.clone(),
         );
 
-        // Determine app_id for Redis cache
-        let app_id = if let Some(client_id) = &login_request.client_id {
-            // Fetch app by client_id
-            use crate::models::schema::schema::app::dsl::*;
-            app.filter(client_id.eq(client_id))
-                .select(id)
-                .first::<i64>(&mut conn)
-                .ok()
-        } else {
-            None
-        };
+        // Create tokens without app_id
+        let access_token_without_app = create_jwt(
+            &u.email_id,
+            &u.id.to_string(),
+            "access",
+            &u.first_name,
+            &u.last_name,
+            &u.middle_name,
+            &None,
+        );
+        let refresh_token_without_app = create_jwt(
+            &u.email_id,
+            &u.id.to_string(),
+            "refresh",
+            &u.first_name,
+            &u.last_name,
+            &u.middle_name,
+            &None,
+        );
 
-        // Store session data in Redis
-        let session_data = json!({
+        // Store the refresh token with app_id in Redis
+        if let Some(app_id) = &app_id {
+            let session_data_with_app = json!({
+                "user_id": u.id,
+                "app_id": app_id,
+            });
+            let _: () = cache_connection
+                .set_ex(
+                    refresh_token_with_app.clone(),
+                    session_data_with_app.to_string(),
+                    3600, // Token expires in 1 hour
+                )
+                .map_err(|_| rocket::http::Status::InternalServerError)?;
+        }
+
+        // Store the refresh token without app_id in Redis
+        let session_data_without_app = json!({
             "user_id": u.id,
-            "app_id": app_id, // `null` if no client_id provided
         });
         let _: () = cache_connection
-            .set_ex(refresh_token.clone(), session_data.to_string(), 3600) // Token expires in 1 hour
+            .set_ex(
+                refresh_token_without_app.clone(),
+                session_data_without_app.to_string(),
+                3600, // Token expires in 1 hour
+            )
             .map_err(|_| rocket::http::Status::InternalServerError)?;
 
-        // Return tokens in the response
-        Ok(Json(LoginResponse {
-            access_token,
-            refresh_token,
+        // Return both sets of tokens
+        Ok(Json(IAMLoginResponse {
+            app_tokens: LoginResponse {
+                access_token: access_token_with_app,
+                refresh_token: refresh_token_with_app,
+            },
+            iam_tokens: LoginResponse {
+                access_token: access_token_without_app,
+                refresh_token: refresh_token_without_app,
+            },
         }))
     } else {
         // Respond with Unauthorized status if password is invalid

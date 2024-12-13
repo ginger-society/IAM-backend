@@ -86,3 +86,9 @@ pub struct AccessibleApp {
     pub redirection_path: Option<String>,
     pub has_web_interface: bool,
 }
+
+#[derive(Serialize, JsonSchema)]
+pub struct IAMLoginResponse {
+    pub app_tokens: LoginResponse,
+    pub iam_tokens: LoginResponse,
+}
