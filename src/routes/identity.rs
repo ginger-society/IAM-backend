@@ -25,7 +25,9 @@ use NotificationService::get_configuration as get_notification_service_configura
 
 use crate::middlewares::groups::GroupMemberships;
 use crate::middlewares::groups_owned::GroupOwnerships;
-use crate::models::request::{AcceptInviteRequest, InviteRequest, RegisterRequestValue};
+use crate::models::request::{
+    AcceptInviteRequest, CreateOrUpdateAppRequest, InviteRequest, RegisterRequestValue,
+};
 use crate::models::request::{
     ChangePasswordRequest, CreateApiTokenRequest, CreateGroupRequest, CreateSessionTokenRequest,
     LoginRequest, LogoutRequest, RefreshTokenRequest, RegisterRequest, RequestPasswordRequest,
@@ -37,8 +39,8 @@ use crate::models::response::{
     ValidateTokenResponse,
 };
 use crate::models::schema::{
-    Api_Token, Api_TokenInsertable, App, Group, GroupInsertable, Group_OwnersInsertable,
-    Group_UsersInsertable, User, UserInsertable,
+    Api_Token, Api_TokenInsertable, App, AppInsertable, Group, GroupInsertable,
+    Group_OwnersInsertable, Group_UsersInsertable, User, UserInsertable,
 };
 use rand::distributions::Alphanumeric;
 use NotificationService::models::EmailRequest;
@@ -1528,4 +1530,131 @@ pub fn generate_app_tokens(
         access_token,
         refresh_token,
     }))
+}
+
+#[openapi]
+#[post("/create_or_update_app", data = "<app_request>")]
+pub async fn create_or_update_app(
+    app_request: Json<CreateOrUpdateAppRequest>,
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    _claims: APIClaims, // Assuming claims are passed for authentication/authorization
+) -> Result<status::Created<Json<MessageResponse>>, status::Custom<Json<MessageResponse>>> {
+    use crate::models::schema::schema::app::dsl as app_dsl;
+
+    let mut conn = rdb.get().map_err(|_| {
+        status::Custom(
+            Status::ServiceUnavailable,
+            Json(MessageResponse {
+                message: "Failed to get DB connection".to_string(),
+            }),
+        )
+    })?;
+
+    // Check if the app exists
+    let existing_app = app_dsl::app
+        .filter(app_dsl::client_id.eq(&app_request.client_id))
+        .first::<App>(&mut conn)
+        .optional()
+        .map_err(|_| {
+            status::Custom(
+                Status::InternalServerError,
+                Json(MessageResponse {
+                    message: "Error retrieving app".to_string(),
+                }),
+            )
+        })?;
+
+    if let Some(app) = existing_app {
+        // Update the existing app
+        diesel::update(app_dsl::app.filter(app_dsl::id.eq(app.id)))
+            .set((
+                app_request.name.as_ref().map(|name| app_dsl::name.eq(name)),
+                app_request
+                    .logo_url
+                    .as_ref()
+                    .map(|url| app_dsl::logo_url.eq(url)),
+                app_request
+                    .disabled
+                    .map(|disabled| app_dsl::disabled.eq(disabled)),
+                app_request
+                    .app_url_dev
+                    .as_ref()
+                    .map(|url| app_dsl::app_url_dev.eq(url)),
+                app_request
+                    .app_url_stage
+                    .as_ref()
+                    .map(|url| app_dsl::app_url_stage.eq(url)),
+                app_request
+                    .app_url_prod
+                    .as_ref()
+                    .map(|url| app_dsl::app_url_prod.eq(url)),
+                app_request
+                    .group_id
+                    .map(|group| app_dsl::group_id.eq(group)),
+                app_request
+                    .tnc_link
+                    .as_ref()
+                    .map(|link| app_dsl::tnc_link.eq(link)),
+                app_request
+                    .allow_registration
+                    .map(|allow| app_dsl::allow_registration.eq(allow)),
+                app_request
+                    .description
+                    .as_ref()
+                    .map(|desc| app_dsl::description.eq(desc)),
+                app_request
+                    .auth_redirection_path
+                    .as_ref()
+                    .map(|path| app_dsl::auth_redirection_path.eq(path)),
+                app_request
+                    .web_interface
+                    .map(|web| app_dsl::web_interface.eq(web)),
+            ))
+            .execute(&mut conn)
+            .map_err(|_| {
+                status::Custom(
+                    Status::InternalServerError,
+                    Json(MessageResponse {
+                        message: "Error updating app".to_string(),
+                    }),
+                )
+            })?;
+
+        Ok(status::Created::new("/app").body(Json(MessageResponse {
+            message: "App updated successfully".to_string(),
+        })))
+    } else {
+        // Create a new app
+        let new_app = AppInsertable {
+            client_id: app_request.client_id.clone(),
+            name: app_request.name.clone().unwrap_or_default(),
+            logo_url: app_request.logo_url.clone(),
+            disabled: app_request.disabled.unwrap_or(false),
+            app_url_dev: app_request.app_url_dev.clone(),
+            app_url_stage: app_request.app_url_stage.clone(),
+            app_url_prod: app_request.app_url_prod.clone(),
+            group_id: app_request.group_id,
+            tnc_link: app_request.tnc_link.clone(),
+            allow_registration: app_request.allow_registration.unwrap_or(false),
+            description: app_request.description.clone(),
+            auth_redirection_path: app_request.auth_redirection_path.clone(),
+            web_interface: app_request.web_interface.unwrap_or(false),
+        };
+
+        diesel::insert_into(app_dsl::app)
+            .values(&new_app)
+            .execute(&mut conn)
+            .map_err(|_| {
+                status::Custom(
+                    Status::InternalServerError,
+                    Json(MessageResponse {
+                        message: "Error creating app".to_string(),
+                    }),
+                )
+            })?;
+
+        Ok(status::Created::new("/app").body(Json(MessageResponse {
+            message: "App created successfully".to_string(),
+        })))
+    }
 }

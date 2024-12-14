@@ -93,3 +93,20 @@ pub struct InviteRequest {
     pub email: String,
     pub is_root: bool,
 }
+
+#[derive(Serialize, Deserialize, Debug, JsonSchema)]
+pub struct CreateOrUpdateAppRequest {
+    pub client_id: String,
+    pub name: Option<String>,
+    pub logo_url: Option<String>,
+    pub disabled: Option<bool>,
+    pub app_url_dev: Option<String>,
+    pub app_url_stage: Option<String>,
+    pub app_url_prod: Option<String>,
+    pub group_id: Option<i64>,
+    pub tnc_link: Option<String>,
+    pub allow_registration: Option<bool>,
+    pub description: Option<String>,
+    pub auth_redirection_path: Option<String>,
+    pub web_interface: Option<bool>,
+}

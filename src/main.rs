@@ -56,7 +56,8 @@ fn rocket() -> Rocket<Build> {
                 identity::registeration_confirmation,
                 identity::accept_invite,
                 identity::get_accessible_apps,
-                identity::generate_app_tokens
+                identity::generate_app_tokens,
+                identity::create_or_update_app
             ],
         )
         .mount(
