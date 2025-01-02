@@ -237,6 +237,30 @@ pub fn registeration_confirmation(
 
     Ok(Json("User registered successfully".to_string()))
 }
+
+fn user_has_access_to_app(
+    conn: &mut PgConnection,
+    app_id: &String,
+    user_groups: &[String],
+) -> Result<bool, diesel::result::Error> {
+    use crate::models::schema::schema::app::dsl as app_dsl;
+    use crate::models::schema::schema::group::dsl as group_dsl;
+
+    // Check if the app exists and the user has access
+    let accessible_app_exists = app_dsl::app
+        .left_join(group_dsl::group.on(group_dsl::id.nullable().eq(app_dsl::group_id)))
+        .filter(app_dsl::client_id.eq(app_id))
+        .filter(
+            group_dsl::identifier
+                .is_null()
+                .or(group_dsl::identifier.eq_any(user_groups)),
+        )
+        .select(app_dsl::id)
+        .first::<i64>(conn)
+        .optional()?;
+
+    Ok(accessible_app_exists.is_some())
+}
 #[openapi()]
 #[post("/login", data = "<login_request>")]
 pub fn login(
@@ -266,6 +290,34 @@ pub fn login(
         .map_err(|_| rocket::http::Status::Unauthorized)?;
 
     if valid {
+        // Fetch user_groups from cache or database
+        let cache_key = format!("user_groups:{}", u.id);
+        let user_groups: Vec<String> = match cache_connection.get::<_, Option<String>>(&cache_key) {
+            Ok(Some(cached_groups)) => {
+                serde_json::from_str(&cached_groups).unwrap_or_else(|_| vec![])
+            }
+            Ok(None) | Err(_) => {
+                // Fallback to database if cache miss
+                use crate::models::schema::schema::group::dsl as group_dsl;
+                use crate::models::schema::schema::group_users::dsl as gu_dsl;
+
+                let groups_from_db: Vec<String> = gu_dsl::group_users
+                    .inner_join(group_dsl::group.on(group_dsl::id.eq(gu_dsl::group_id)))
+                    .filter(gu_dsl::user_id.eq(u.id))
+                    .select(group_dsl::identifier)
+                    .load(&mut conn)
+                    .unwrap_or_else(|_| vec![]);
+
+                // Cache the result
+                let groups_json = serde_json::to_string(&groups_from_db).unwrap_or_default();
+                let _: () = cache_connection
+                    .set_ex(&cache_key, groups_json, 3600) // Cache for 1 hour
+                    .unwrap_or(());
+
+                groups_from_db
+            }
+        };
+
         // Determine app_id for Redis cache
         let app_id = if let Some(app_id) = &login_request.client_id {
             // Fetch app by client_id
@@ -281,43 +333,47 @@ pub fn login(
 
         // Create tokens with app_id if provided
         let app_tokens = if let Some(app_id) = &app_id {
-            // Create tokens with app_id
-            let access_token = create_jwt(
-                &u.email_id,
-                &u.id.to_string(),
-                "access",
-                &u.first_name,
-                &u.last_name,
-                &u.middle_name,
-                &Some(app_id.clone()),
-            );
-            let refresh_token = create_jwt(
-                &u.email_id,
-                &u.id.to_string(),
-                "refresh",
-                &u.first_name,
-                &u.last_name,
-                &u.middle_name,
-                &Some(app_id.clone()),
-            );
+            if user_has_access_to_app(&mut conn, app_id, &user_groups)
+                .map_err(|_| rocket::http::Status::InternalServerError)?
+            {
+                let access_token = create_jwt(
+                    &u.email_id,
+                    &u.id.to_string(),
+                    "access",
+                    &u.first_name,
+                    &u.last_name,
+                    &u.middle_name,
+                    &Some(app_id.clone()),
+                );
+                let refresh_token = create_jwt(
+                    &u.email_id,
+                    &u.id.to_string(),
+                    "refresh",
+                    &u.first_name,
+                    &u.last_name,
+                    &u.middle_name,
+                    &Some(app_id.clone()),
+                );
 
-            // Store the refresh token with app_id in Redis
-            let session_data_with_app = json!({
-                "user_id": u.id,
-                "app_id": app_id,
-            });
-            let _: () = cache_connection
-                .set_ex(
-                    refresh_token.clone(),
-                    session_data_with_app.to_string(),
-                    3600, // Token expires in 1 hour
-                )
-                .map_err(|_| rocket::http::Status::InternalServerError)?;
+                let session_data_with_app = json!({
+                    "user_id": u.id,
+                    "app_id": app_id,
+                });
+                let _: () = cache_connection
+                    .set_ex(
+                        refresh_token.clone(),
+                        session_data_with_app.to_string(),
+                        3600, // Token expires in 1 hour
+                    )
+                    .map_err(|_| rocket::http::Status::InternalServerError)?;
 
-            Some(LoginResponse {
-                access_token,
-                refresh_token,
-            })
+                Some(LoginResponse {
+                    access_token,
+                    refresh_token,
+                })
+            } else {
+                return Err(rocket::http::Status::Forbidden);
+            }
         } else {
             None
         };
@@ -342,7 +398,6 @@ pub fn login(
             &None,
         );
 
-        // Store the refresh token without app_id in Redis
         let session_data_without_app = json!({
             "user_id": u.id,
         });
@@ -354,7 +409,6 @@ pub fn login(
             )
             .map_err(|_| rocket::http::Status::InternalServerError)?;
 
-        // Return tokens
         Ok(Json(IAMLoginResponse {
             app_tokens,
             iam_tokens: LoginResponse {
@@ -363,7 +417,6 @@ pub fn login(
             },
         }))
     } else {
-        // Respond with Unauthorized status if password is invalid
         Err(rocket::http::Status::Unauthorized)
     }
 }
