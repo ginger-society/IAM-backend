@@ -246,6 +246,10 @@ fn user_has_access_to_app(
     use crate::models::schema::schema::app::dsl as app_dsl;
     use crate::models::schema::schema::group::dsl as group_dsl;
 
+    let group_ids: Vec<i64> = user_groups
+        .iter()
+        .filter_map(|group| group.parse::<i64>().ok())
+        .collect();
     // Check if the app exists and the user has access
     let accessible_app_exists = app_dsl::app
         .left_join(group_dsl::group.on(group_dsl::id.nullable().eq(app_dsl::group_id)))
@@ -253,7 +257,8 @@ fn user_has_access_to_app(
         .filter(
             group_dsl::identifier
                 .is_null()
-                .or(group_dsl::identifier.eq_any(user_groups)),
+                .or(group_dsl::identifier.eq_any(user_groups))
+                .or(group_dsl::id.eq_any(&group_ids)),
         )
         .select(app_dsl::id)
         .first::<i64>(conn)
