@@ -959,7 +959,9 @@ pub fn logout(
         .map_err(|_| rocket::http::Status::InternalServerError)?;
 
     if !refresh_token_exists {
-        return Err(rocket::http::Status::Unauthorized);
+        return Ok(Json(MessageResponse {
+            message: "Logged out successfully".to_string(),
+        }));
     }
 
     // Remove the refresh token from Redis
