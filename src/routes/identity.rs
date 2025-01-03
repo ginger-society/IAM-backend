@@ -1520,7 +1520,6 @@ pub fn get_accessible_apps(
 
     Ok(Json(accessible_apps))
 }
-
 #[openapi()]
 #[post("/generate-app-tokens/<app_id>")]
 pub fn generate_app_tokens(
@@ -1528,9 +1527,8 @@ pub fn generate_app_tokens(
     cache_pool: &State<Pool<RedisConnectionManager>>,
     app_id: String,
     claims: Claims,
+    groups: GroupMemberships, // Injected user groups
 ) -> Result<Json<LoginResponse>, rocket::http::Status> {
-    use crate::models::schema::schema::app::dsl as app_dsl;
-
     let mut conn = rdb
         .get()
         .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
@@ -1539,15 +1537,11 @@ pub fn generate_app_tokens(
         .get()
         .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
 
-    // Validate the app_id exists
-    let app_exists = app_dsl::app
-        .filter(app_dsl::client_id.eq(&app_id)) // Assuming client_id is a string column in the app table
-        .select(app_dsl::id)
-        .first::<i64>(&mut conn)
-        .is_ok();
-
-    if !app_exists {
-        return Err(rocket::http::Status::BadRequest);
+    // Validate if the app exists and the user has access
+    if !user_has_access_to_app(&mut conn, &app_id, &groups.0)
+        .map_err(|_| rocket::http::Status::InternalServerError)?
+    {
+        return Err(rocket::http::Status::Forbidden);
     }
 
     // Generate new tokens
