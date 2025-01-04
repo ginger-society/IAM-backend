@@ -245,28 +245,49 @@ fn user_has_access_to_app(
 ) -> Result<bool, diesel::result::Error> {
     use crate::models::schema::schema::app::dsl as app_dsl;
     use crate::models::schema::schema::group::dsl as group_dsl;
-    println!("{:?}", user_groups);
+
+    println!("User groups: {:?}", user_groups);
+
     let group_ids: Vec<i64> = user_groups
         .iter()
         .filter_map(|group| group.parse::<i64>().ok())
         .collect();
-    // Check if the app exists and the user has access
+
+    // Step 1: Check if app.group_id is NULL
+    let app_has_no_group = app_dsl::app
+        .filter(app_dsl::client_id.eq(app_id))
+        .filter(app_dsl::group_id.is_null())
+        .select(app_dsl::id)
+        .first::<i64>(conn)
+        .optional()?;
+
+    if app_has_no_group.is_some() {
+        println!("App is accessible as it has no group associated.");
+        return Ok(true);
+    }
+
+    // Step 2: Check if app.group_id matches user groups
     let accessible_app_exists = app_dsl::app
         .left_join(group_dsl::group.on(group_dsl::id.nullable().eq(app_dsl::group_id)))
         .filter(app_dsl::client_id.eq(app_id))
         .filter(
-            app_dsl::group_id
-                .is_null()
-                .or(group_dsl::identifier.eq_any(user_groups))
+            group_dsl::identifier
+                .eq_any(user_groups)
                 .or(group_dsl::id.eq_any(&group_ids)),
         )
         .select(app_dsl::id)
         .first::<i64>(conn)
         .optional()?;
 
-    println!("{:?}", accessible_app_exists);
-    Ok(accessible_app_exists.is_some())
+    if accessible_app_exists.is_some() {
+        println!("App is accessible based on group membership.");
+        Ok(true)
+    } else {
+        println!("App is not accessible for the user.");
+        Ok(false)
+    }
 }
+
 #[openapi()]
 #[post("/login", data = "<login_request>")]
 pub fn login(
