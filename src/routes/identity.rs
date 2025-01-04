@@ -237,7 +237,6 @@ pub fn registeration_confirmation(
 
     Ok(Json("User registered successfully".to_string()))
 }
-
 fn user_has_access_to_app(
     conn: &mut PgConnection,
     app_id: &String,
@@ -245,6 +244,19 @@ fn user_has_access_to_app(
 ) -> Result<bool, diesel::result::Error> {
     use crate::models::schema::schema::app::dsl as app_dsl;
     use crate::models::schema::schema::group::dsl as group_dsl;
+
+    // Check if the app exists and is not disabled
+    let app = match app_dsl::app
+        .filter(app_dsl::client_id.eq(app_id))
+        .filter(app_dsl::disabled.eq(false))
+        .first::<App>(conn)
+    {
+        Ok(app) => app,
+        Err(_) => {
+            println!("App does not exist or is disabled: {}", app_id);
+            return Ok(false);
+        }
+    };
 
     println!("User groups: {:?}", user_groups);
 
@@ -254,14 +266,11 @@ fn user_has_access_to_app(
         .collect();
 
     // Step 1: Check if app.group_id is NULL
-    let app_has_no_group = app_dsl::app
-        .filter(app_dsl::client_id.eq(app_id))
-        .filter(app_dsl::group_id.is_null())
-        .first::<App>(conn)
-        .optional()?;
-    println!("app_has_no_group: {:?} ", app_has_no_group);
-    if app_has_no_group.is_some() {
-        println!("App is accessible as it has no group associated.");
+    if app.group_id.is_none() {
+        println!(
+            "App is accessible as it has no group associated: {}",
+            app_id
+        );
         return Ok(true);
     }
 
@@ -279,10 +288,10 @@ fn user_has_access_to_app(
         .optional()?;
 
     if accessible_app_exists.is_some() {
-        println!("App is accessible based on group membership.");
+        println!("App is accessible based on group membership: {}", app_id);
         Ok(true)
     } else {
-        println!("App is not accessible for the user.");
+        println!("App is not accessible for the user: {}", app_id);
         Ok(false)
     }
 }
