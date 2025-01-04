@@ -255,7 +255,7 @@ fn user_has_access_to_app(
         .left_join(group_dsl::group.on(group_dsl::id.nullable().eq(app_dsl::group_id)))
         .filter(app_dsl::client_id.eq(app_id))
         .filter(
-            group_dsl::identifier
+            app_dsl::group_id
                 .is_null()
                 .or(group_dsl::identifier.eq_any(user_groups))
                 .or(group_dsl::id.eq_any(&group_ids)),
