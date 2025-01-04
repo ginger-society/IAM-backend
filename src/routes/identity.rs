@@ -260,7 +260,7 @@ fn user_has_access_to_app(
         .select(app_dsl::id)
         .first::<i64>(conn)
         .optional()?;
-
+    println!("app_has_no_group: {:?} ", app_has_no_group);
     if app_has_no_group.is_some() {
         println!("App is accessible as it has no group associated.");
         return Ok(true);
