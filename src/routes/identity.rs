@@ -1,4 +1,4 @@
-use crate::models::response::{AccessibleApp, IAMLoginResponse};
+use crate::models::response::{AccessibleApp, IAMLoginResponse, IsMemberResponse};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use diesel::pg::Pg;
@@ -1732,4 +1732,23 @@ pub async fn create_or_update_app(
             message: "App created successfully".to_string(),
         })))
     }
+}
+
+#[openapi()]
+#[get("/is_member/<group_param>")]
+pub fn is_member(
+    group_param: String,
+    groups: GroupMemberships,      // Injected group memberships
+    groups_owned: GroupOwnerships, // Injected group ownerships
+) -> Result<Json<IsMemberResponse>, rocket::http::Status> {
+    // Check if the user is a member of the group
+    let is_member = groups.0.contains(&group_param);
+
+    // Check if the user is an owner of the group
+    let is_owner = groups_owned.0.contains(&group_param);
+
+    Ok(Json(IsMemberResponse {
+        is_member,
+        is_owner,
+    }))
 }

@@ -57,7 +57,8 @@ fn rocket() -> Rocket<Build> {
                 identity::accept_invite,
                 identity::get_accessible_apps,
                 identity::generate_app_tokens,
-                identity::create_or_update_app
+                identity::create_or_update_app,
+                identity::is_member
             ],
         )
         .mount(

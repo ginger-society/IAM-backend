@@ -92,3 +92,9 @@ pub struct IAMLoginResponse {
     pub app_tokens: Option<LoginResponse>,
     pub iam_tokens: LoginResponse,
 }
+
+#[derive(Serialize, JsonSchema)]
+pub struct IsMemberResponse {
+    pub is_member: bool,
+    pub is_owner: bool,
+}
