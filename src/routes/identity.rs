@@ -257,8 +257,7 @@ fn user_has_access_to_app(
     let app_has_no_group = app_dsl::app
         .filter(app_dsl::client_id.eq(app_id))
         .filter(app_dsl::group_id.is_null())
-        .select(app_dsl::id)
-        .first::<i64>(conn)
+        .first::<App>(conn)
         .optional()?;
     println!("app_has_no_group: {:?} ", app_has_no_group);
     if app_has_no_group.is_some() {
