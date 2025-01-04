@@ -264,6 +264,7 @@ fn user_has_access_to_app(
         .first::<i64>(conn)
         .optional()?;
 
+    println!("{:?}", accessible_app_exists);
     Ok(accessible_app_exists.is_some())
 }
 #[openapi()]
