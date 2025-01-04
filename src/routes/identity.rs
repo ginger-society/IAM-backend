@@ -245,7 +245,7 @@ fn user_has_access_to_app(
 ) -> Result<bool, diesel::result::Error> {
     use crate::models::schema::schema::app::dsl as app_dsl;
     use crate::models::schema::schema::group::dsl as group_dsl;
-
+    println!("{:?}", user_groups);
     let group_ids: Vec<i64> = user_groups
         .iter()
         .filter_map(|group| group.parse::<i64>().ok())
