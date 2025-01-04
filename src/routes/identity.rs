@@ -378,6 +378,7 @@ pub fn login(
                     refresh_token,
                 })
             } else {
+                println!("User does not have access to the app");
                 return Err(rocket::http::Status::Forbidden);
             }
         } else {
