@@ -354,17 +354,7 @@ pub fn login(
         };
 
         // Determine app_id for Redis cache
-        let app_id = if let Some(app_id) = &login_request.client_id {
-            // Fetch app by client_id
-            use crate::models::schema::schema::app::dsl::*;
-            app.filter(client_id.eq(app_id))
-                .select(id)
-                .first::<i64>(&mut conn)
-                .ok()
-                .map(|app_pk| app_pk.to_string()) // Convert app_id to String
-        } else {
-            None
-        };
+        let app_id = login_request.client_id.clone();
 
         // Create tokens with app_id if provided
         let app_tokens = if let Some(app_id) = &app_id {
