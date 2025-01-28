@@ -1,27 +1,4 @@
 ## 0.5.1-nightly.0 - 2025-01-28
-chore:
- - [c702c7ad17](https://github.com/ginger-society/IAM-backendc702c7ad176696d3f8d77e6b023447913bd840d8) (Ginger Society Admin) chore: debugging
-	
- - [00bd379eff](https://github.com/ginger-society/IAM-backend00bd379effc316818c0302cdf34078c3db106392) (Ginger Society Admin) chore: debugging
-	
- - [f9242764a5](https://github.com/ginger-society/IAM-backendf9242764a54c34a286e516a38899f0fe6737dbcc) (Ginger Society Admin) chore: debugging
-	
- - [41372b9211](https://github.com/ginger-society/IAM-backend41372b9211c1f09c659b704241d441f6db2776a6) (Ginger Society Admin) chore: debugging
-	
- - [5391f5d4f0](https://github.com/ginger-society/IAM-backend5391f5d4f02ada0d8acc6e5ef84a66b66cb64e41) (Ginger Society Admin) chore: debugging
-	
- - [94c78105b2](https://github.com/ginger-society/IAM-backend94c78105b215959320a383181960dd6fa87ff29a) (Ginger Society Admin) chore: renaming pipeline status
-	
- - [fcf0506a8a](https://github.com/ginger-society/IAM-backendfcf0506a8ae1ea92e21b1a18950121d477b73a28) (Ginger Society Admin) chore: updated cache expiry time to 5 minutes for password reset and registration and also fixed email subject
-	
- - [dca07392db](https://github.com/ginger-society/IAM-backenddca07392db0f4dc2209fe4ff6c86f08ede699018) (Ginger Society Admin) chore: updated config
-	
- - [03f6e0030d](https://github.com/ginger-society/IAM-backend03f6e0030de7d4494e5a0fcd0d1daa603adb4f86) (Ginger Society Admin) chore: minor changes
-	
- - [2b597557bb](https://github.com/ginger-society/IAM-backend2b597557bb734b928d41e9909a5aa4ced975390a) (Ginger Society Admin) chore: renamed endpoint url
-	
- - [e87e319ff4](https://github.com/ginger-society/IAM-backende87e319ff49274830737a00537086cdc585f654e) (Ginger Society Admin) chore: typo
-	
 feat:
  - [8e2c6decf1](https://github.com/ginger-society/IAM-backend8e2c6decf100d17af08994b62f9504027d1fcc45) (Ginger Society Admin) feat: added is member endpoint
 	
@@ -143,15 +120,6 @@ feat:
 	
  - [c56451b507](https://github.com/ginger-society/IAM-backendc56451b507b2902919c24953493a3ac56ac39f98) (Ginger Society Admin) feat: added k8 metadata publish step in pipeline
 	
-sending
- - [89061ba561](https://github.com/ginger-society/IAM-backend89061ba561efe28a6628d6a1e615b40e1b37cdc9) (Ginger Society Admin) sending optional app tokens
-	
-feat
- - [188e90c48b](https://github.com/ginger-society/IAM-backend188e90c48be58486a502befeebc258e9299d5643) (Ginger Society Admin) feat :added endpoint get tokens for a given group identifier
-	
-fix:unique
- - [1d4aa455f2](https://github.com/ginger-society/IAM-backend1d4aa455f2038b917a7587d688ba734a802c1ee0) (Ginger Society Admin) fix:unique email id
-	
 fix:
  - [a622d1671d](https://github.com/ginger-society/IAM-backenda622d1671d5b397088d241bd78adf14b9e747335) (Ginger Society Admin) fix: changing comparision in filter for permission check
 	
@@ -184,6 +152,40 @@ fix:
  - [0a7b7dc4dc](https://github.com/ginger-society/IAM-backend0a7b7dc4dcfbfa5f3bc8376519a67c677d99fcbd) (Ginger Society Admin) fix: typo causing build failures
 	
  - [fe6b5338bb](https://github.com/ginger-society/IAM-backendfe6b5338bb4dd70d2506033fa416b8d3c44db8ef) (Ginger Society Admin) fix: pipeline
+	
+feat
+ - [188e90c48b](https://github.com/ginger-society/IAM-backend188e90c48be58486a502befeebc258e9299d5643) (Ginger Society Admin) feat :added endpoint get tokens for a given group identifier
+	
+sending
+ - [89061ba561](https://github.com/ginger-society/IAM-backend89061ba561efe28a6628d6a1e615b40e1b37cdc9) (Ginger Society Admin) sending optional app tokens
+	
+chore:
+ - [4de392ad4d](https://github.com/ginger-society/IAM-backend4de392ad4da8968fa4c66f43eb94df98c9658752) (Ginger Society Admin) chore: version bump to 0.5.1-nightly.0
+	
+ - [c702c7ad17](https://github.com/ginger-society/IAM-backendc702c7ad176696d3f8d77e6b023447913bd840d8) (Ginger Society Admin) chore: debugging
+	
+ - [00bd379eff](https://github.com/ginger-society/IAM-backend00bd379effc316818c0302cdf34078c3db106392) (Ginger Society Admin) chore: debugging
+	
+ - [f9242764a5](https://github.com/ginger-society/IAM-backendf9242764a54c34a286e516a38899f0fe6737dbcc) (Ginger Society Admin) chore: debugging
+	
+ - [41372b9211](https://github.com/ginger-society/IAM-backend41372b9211c1f09c659b704241d441f6db2776a6) (Ginger Society Admin) chore: debugging
+	
+ - [5391f5d4f0](https://github.com/ginger-society/IAM-backend5391f5d4f02ada0d8acc6e5ef84a66b66cb64e41) (Ginger Society Admin) chore: debugging
+	
+ - [94c78105b2](https://github.com/ginger-society/IAM-backend94c78105b215959320a383181960dd6fa87ff29a) (Ginger Society Admin) chore: renaming pipeline status
+	
+ - [fcf0506a8a](https://github.com/ginger-society/IAM-backendfcf0506a8ae1ea92e21b1a18950121d477b73a28) (Ginger Society Admin) chore: updated cache expiry time to 5 minutes for password reset and registration and also fixed email subject
+	
+ - [dca07392db](https://github.com/ginger-society/IAM-backenddca07392db0f4dc2209fe4ff6c86f08ede699018) (Ginger Society Admin) chore: updated config
+	
+ - [03f6e0030d](https://github.com/ginger-society/IAM-backend03f6e0030de7d4494e5a0fcd0d1daa603adb4f86) (Ginger Society Admin) chore: minor changes
+	
+ - [2b597557bb](https://github.com/ginger-society/IAM-backend2b597557bb734b928d41e9909a5aa4ced975390a) (Ginger Society Admin) chore: renamed endpoint url
+	
+ - [e87e319ff4](https://github.com/ginger-society/IAM-backende87e319ff49274830737a00537086cdc585f654e) (Ginger Society Admin) chore: typo
+	
+fix:unique
+ - [1d4aa455f2](https://github.com/ginger-society/IAM-backend1d4aa455f2038b917a7587d688ba734a802c1ee0) (Ginger Society Admin) fix:unique email id
 	
 ## 0.5.0-nightly.0 - 2024-08-05
 chore:
@@ -231,15 +233,6 @@ chore:
  - [f294c0c32f](https://github.com/ginger-society/IAM-backendf294c0c32f3e62218730e04075690469e4ad739b) (Ginger Society Admin) chore: version bump to 0.2.0-nightly.0
 	
 ## 0.1.0-nightly.0 - 2024-07-14
-chore:
- - [7c4c81c842](https://github.com/ginger-society/IAM-backend7c4c81c842dd0d564da2da2d85ada1147cf7d569) (Ginger Society Admin) chore: version bump to 0.1.0-nightly.0
-	
- - [9a414c08b7](https://github.com/ginger-society/IAM-backend9a414c08b7c7fb2b05c9c90196ba99b195e7c0dd) (Ginger Society Admin) chore: tested jwt middleware
-	
- - [98dd81c016](https://github.com/ginger-society/IAM-backend98dd81c016d1d26864311a3ede3016c7ca2699cb) (Ginger Society Admin) chore: cleanup
-	
- - [23ccfd1089](https://github.com/ginger-society/IAM-backend23ccfd1089fd8b5c7aef0336a258a8773722700d) (Ginger Society Admin) chore: first commit
-	
 feat:
  - [de67f20d75](https://github.com/ginger-society/IAM-backendde67f20d75dc847be3e5ed50d9df5a8a1d4a2c71) (Ginger Society Admin) feat: updated readme
 	
@@ -254,4 +247,13 @@ feat:
  - [da78b59f79](https://github.com/ginger-society/IAM-backendda78b59f79d0ad68682ab7d86fe4b686a9164923) (Ginger Society Admin) feat: added refresh token api , validate token , change password
 	
  - [8ce8dbbd1e](https://github.com/ginger-society/IAM-backend8ce8dbbd1e6e966d17c23ed73826374fe9ef9590) (Ginger Society Admin) feat: added register and login endpoints
+	
+chore:
+ - [7c4c81c842](https://github.com/ginger-society/IAM-backend7c4c81c842dd0d564da2da2d85ada1147cf7d569) (Ginger Society Admin) chore: version bump to 0.1.0-nightly.0
+	
+ - [9a414c08b7](https://github.com/ginger-society/IAM-backend9a414c08b7c7fb2b05c9c90196ba99b195e7c0dd) (Ginger Society Admin) chore: tested jwt middleware
+	
+ - [98dd81c016](https://github.com/ginger-society/IAM-backend98dd81c016d1d26864311a3ede3016c7ca2699cb) (Ginger Society Admin) chore: cleanup
+	
+ - [23ccfd1089](https://github.com/ginger-society/IAM-backend23ccfd1089fd8b5c7aef0336a258a8773722700d) (Ginger Society Admin) chore: first commit
 	
