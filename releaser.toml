@@ -2,7 +2,7 @@
 channel = "Nightly"
 major = 0
 minor = 5
-patch = 0
+patch = 1
 revision = 0
 
 [[references]]
