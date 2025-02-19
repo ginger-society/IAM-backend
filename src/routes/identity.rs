@@ -188,7 +188,8 @@ pub async fn register(
                 Ok(Json(
                     "User registration request generated successfully".to_string(),
                 ))
-            }Err(_) => {
+            }Err(e) => {
+                println!("Error while sending mail : {:?}" , e);
                 Err(Status::ServiceUnavailable)
             }
         }
