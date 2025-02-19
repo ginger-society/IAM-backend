@@ -121,9 +121,13 @@ pub async fn register(
 
     let mut conn = rdb.get().expect("Failed to get DB connection");
 
-    let mut cache_connection = cache
-        .get()
-        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+    let mut cache_connection = match cache.get() {
+        Ok(conn) => conn,
+        Err(err) => {
+            error!("Failed to get Redis connection: {}", err);
+            return Err(rocket::http::Status::ServiceUnavailable);
+        }
+    };
 
     // Check if the user with the same email already exists
     let existing_user = user
