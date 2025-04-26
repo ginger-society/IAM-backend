@@ -8,6 +8,7 @@ use diesel::{insert_into, PgConnection, RunQueryDsl};
 use diesel::{prelude::*, update};
 use ginger_shared_rs::rocket_models::MessageResponse;
 use ginger_shared_rs::rocket_utils::{APIClaims, Claims};
+use ginger_shared_rs::rocket_utils::ISCClaims;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use r2d2_redis::redis::Commands;
 use r2d2_redis::RedisConnectionManager;
@@ -1097,8 +1098,8 @@ fn fetch_group_members_ids(
 }
 
 #[openapi()]
-#[get("/get_group_members_ids/<group_identifier>")]
-pub fn get_group_members_ids(
+#[get("/api-land/get_group_members_ids/<group_identifier>")]
+pub fn get_group_members_ids_api_land(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     group_identifier: String,
     _claims: APIClaims,
@@ -1113,6 +1114,17 @@ pub fn get_group_members_ids_user_land(
     rdb: &State<Pool<ConnectionManager<PgConnection>>>,
     group_identifier: String,
     _claims: Claims,
+) -> Result<Json<Vec<i64>>, Status> {
+    let user_ids = fetch_group_members_ids(rdb, &group_identifier)?;
+    Ok(Json(user_ids))
+}
+
+#[openapi()]
+#[get("/get_group_members_ids/<group_identifier>")]
+pub fn get_group_members_ids(
+    rdb: &State<Pool<ConnectionManager<PgConnection>>>,
+    group_identifier: String,
+    _claims: ISCClaims,
 ) -> Result<Json<Vec<i64>>, Status> {
     let user_ids = fetch_group_members_ids(rdb, &group_identifier)?;
     Ok(Json(user_ids))

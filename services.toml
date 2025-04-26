@@ -25,6 +25,6 @@ prod = "https://api.gingersociety.org/iam"
 stage_k8 = "http://iam-service-api-service/iam"
 dev = "http://localhost:8080/iam"
 prod_k8 = "http://iam-service-api-service/iam"
-stage = "https://api-staging.gingersociety.org/iam"
+stage = "https://api.gingersociety.org/iam"
 
 [urls_ws]
