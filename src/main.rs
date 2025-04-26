@@ -53,6 +53,7 @@ fn rocket() -> Rocket<Build> {
                 identity::clear_redis,
                 identity::get_group_members_ids,
                 identity::get_group_members_ids_user_land,
+                identity::get_group_members_ids_api_land,
                 identity::registeration_confirmation,
                 identity::accept_invite,
                 identity::get_accessible_apps,
