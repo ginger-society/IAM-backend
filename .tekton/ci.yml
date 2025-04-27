@@ -87,7 +87,7 @@ spec:
         kubectl rollout restart deployment iam-service-api-deployment \
           -n default
 
-        slee 5
+        sleep 5
 
         curl -X 'POST' \
           'https://api.gingersociety.org/notification/groups/43c6ba1f-a17f-4eb3-b4d8-7a3e565abc8d/publish' \
