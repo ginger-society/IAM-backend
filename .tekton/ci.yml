@@ -87,4 +87,17 @@ spec:
         kubectl rollout restart deployment iam-service-api-deployment \
           -n default
 
+        slee 5
+
+        curl -X 'POST' \
+          'https://api.gingersociety.org/notification/groups/43c6ba1f-a17f-4eb3-b4d8-7a3e565abc8d/publish' \
+          -H 'accept: */*' \
+          -H 'X-ISC-API-Authorization: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJOb3RpZmljYXRpb25TZXJ2aWNlIiwiZXhwIjoxNzc3MjExMjI0LCJvcmdfaWQiOiJnaW5nZXItc29jaWV0eSIsInNjb3BlcyI6W119.lLKGMITmzzC7kL1w_WF3SqWp875SGimGAzDEEMQ61WM' \
+          -H 'Content-Type: application/json' \
+          -d '{
+          "message": "@ginger-society/IAMService",
+          "prefix": "workspace",
+          "pubType": "Group"
+        }'
+
 
