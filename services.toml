@@ -5,26 +5,24 @@ spec_url = "/openapi.json"
 service_type = "RPCEndpoint"
 
 [services."@ginger-society/NotificationService"]
-prod_k8 = "http://notification-service-service"
-dev = "http://localhost:3030"
 stage_k8 = "http://notification-service-service"
-stage = "https://api-staging.gingersociety.org"
+prod_k8 = "http://notification-service-service"
+stage = "https://api.gingersociety.org"
 prod = "https://api.gingersociety.org"
 
 [portals_refs]
 
 [ws_refs."@ginger-society/NotificationService"]
-stage_k8 = "ws://notification-service-service/notification"
 prod_k8 = "ws://notification-service-service/notification"
-stage = "wss://api-staging.gingersociety.org/notification"
+stage = "wss://api.gingersociety.org/notification"
 prod = "wss://api.gingersociety.org/notification"
-dev = "ws://localhost:3030/notification"
+stage_k8 = "ws://notification-service-service/notification"
 
 [urls]
-prod = "https://api.gingersociety.org/iam"
 stage_k8 = "http://iam-service-api-service/iam"
-dev = "http://localhost:8080/iam"
-prod_k8 = "http://iam-service-api-service/iam"
 stage = "https://api.gingersociety.org/iam"
+prod = "https://api.gingersociety.org/iam"
+prod_k8 = "http://iam-service-api-service/iam"
+dev = "http://localhost:8080/iam"
 
 [urls_ws]
