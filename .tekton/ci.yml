@@ -58,7 +58,7 @@ spec:
           --isolation=chroot \
           --storage-driver=vfs \
           -f Dockerfile.builder \
-          --root=/tempcache \
+          --root=$CONTAINERS_STORAGE \
           .
 
         buildah bud \
