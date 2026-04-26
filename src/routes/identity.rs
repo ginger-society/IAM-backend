@@ -218,7 +218,7 @@ pub fn registeration_confirmation(
 
     // Remove the token from cache after reading
     cache_connection
-        .del(&registration_token)
+        .del::<_, ()>(&registration_token)
         .map_err(|_| Status::InternalServerError)?;
 
     let register_request: RegisterRequestValue = serde_json::from_str(&user_data).unwrap();
@@ -1438,7 +1438,7 @@ pub fn accept_invite(
 
     // Remove the token from cache after reading
     cache_connection
-        .del(&invitation_token)
+        .del::<_, ()>(&invitation_token)
         .map_err(|_| Status::InternalServerError)?;
 
     // Deserialize the invitation data
