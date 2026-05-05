@@ -98,3 +98,14 @@ pub struct IsMemberResponse {
     pub is_member: bool,
     pub is_owner: bool,
 }
+
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct DockerTokenResponse {
+    pub token: String,
+    pub expires_in: usize,
+}
+
+
+
+

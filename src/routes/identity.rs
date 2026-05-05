@@ -1,4 +1,4 @@
-use crate::models::response::{AccessibleApp, IAMLoginResponse, IsMemberResponse};
+use crate::models::response::{AccessibleApp, DockerTokenResponse, IAMLoginResponse, IsMemberResponse};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use diesel::pg::Pg;
@@ -45,6 +45,32 @@ use crate::models::schema::{
 };
 use rand::distributions::Alphanumeric;
 use NotificationService::models::EmailRequest;
+
+use p256::ecdsa::SigningKey;
+use p256::pkcs8::DecodePrivateKey;
+use sha2::{Digest, Sha256};
+use base32::Alphabet;
+use spki::EncodePublicKey;
+use serde::{Deserialize, Serialize};
+
+use crate::models::request::DockerAccess;
+
+// ── Shared structs for docker token─────────────────────────────────────────────────────────────
+
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DockerTokenClaims {
+    iss: String,
+    sub: String,
+    aud: String,
+    exp: usize,
+    nbf: usize,
+    iat: usize,
+    jti: String,
+    access: Vec<DockerAccess>,
+}
+
+
 
 #[openapi()]
 #[post("/change-password", data = "<change_password_request>")]
@@ -1768,4 +1794,140 @@ pub fn is_member(
         is_member,
         is_owner,
     }))
+}
+
+
+
+// ── Libtrust kid computation ───────────────────────────────────────────────────
+
+fn compute_libtrust_kid(signing_key: &SigningKey) -> String {
+    // Get DER-encoded SubjectPublicKeyInfo
+    let pub_der = signing_key
+        .verifying_key()
+        .to_public_key_der()
+        .expect("Failed to encode public key to DER");
+
+    // SHA256 of the DER bytes, take first 30 bytes (240 bits)
+    let digest = Sha256::digest(pub_der.as_bytes());
+    let truncated = &digest[..30];
+
+    // Base32-encode (no padding) → 48 chars → split into 12 groups of 4
+    let b32 = base32::encode(Alphabet::RFC4648 { padding: false }, truncated);
+    b32.chars()
+        .collect::<Vec<char>>()
+        .chunks(4)
+        .map(|c| c.iter().collect::<String>())
+        .collect::<Vec<String>>()
+        .join(":")
+}
+
+// ── Core token generation function ────────────────────────────────────────────
+
+fn generate_docker_token(
+    service: &str,
+    scope: Option<&str>,
+    account: &str,
+) -> Result<DockerTokenResponse, rocket::http::Status> {
+    // Load private key from environment
+    let pem = env::var("DOCKER_REGISTRY_PRIVATE_KEY")
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    let signing_key = SigningKey::from_pkcs8_pem(&pem)
+        .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    let kid = compute_libtrust_kid(&signing_key);
+
+    // Parse scope(s) — Docker can send space-separated multiple scopes
+    let access: Vec<DockerAccess> = scope
+        .unwrap_or("")
+        .split_whitespace()
+        .filter_map(|s| {
+            let parts: Vec<&str> = s.splitn(3, ':').collect();
+            if parts.len() == 3 {
+                let actions = parts[2]
+                    .split(',')
+                    .filter(|a| !a.is_empty())
+                    .map(String::from)
+                    .collect();
+                Some(DockerAccess {
+                    resource_type: parts[0].to_string(),
+                    name: parts[1].to_string(),
+                    actions,
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let now = Utc::now().timestamp() as usize;
+    let jti: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(32)
+        .map(char::from)
+        .collect();
+
+    let issuer = env::var("DOCKER_TOKEN_ISSUER")
+        .unwrap_or_else(|_| "my-auth-server".to_string());
+
+    let claims = DockerTokenClaims {
+        iss: issuer,
+        sub: account.to_string(),
+        aud: service.to_string(),
+        exp: now + 300,
+        nbf: now.saturating_sub(10),
+        iat: now,
+        jti,
+        access,
+    };
+
+    // Build the JWT header with kid
+    let mut header = Header::new(Algorithm::ES256);
+    header.kid = Some(kid);
+    header.typ = Some("JWT".to_string());
+
+    // Encode using the EC private key (PEM)
+    let token = encode(
+        &header,
+        &claims,
+        &EncodingKey::from_ec_pem(pem.as_bytes())
+            .map_err(|_| rocket::http::Status::InternalServerError)?,
+    )
+    .map_err(|_| rocket::http::Status::InternalServerError)?;
+
+    Ok(DockerTokenResponse {
+        token,
+        expires_in: 300,
+    })
+}
+
+// ── Handler: User JWT (Claims) ─────────────────────────────────────────────────
+
+#[openapi()]
+#[get("/docker-token?<service>&<scope>&<account>")]
+pub fn get_docker_token_user(
+    claims: Claims,
+    service: String,
+    scope: Option<String>,
+    account: Option<String>,
+) -> Result<Json<DockerTokenResponse>, rocket::http::Status> {
+    // Use the authenticated user's email as the subject if account not provided
+    let subject = account.unwrap_or_else(|| claims.sub.clone());
+    let response = generate_docker_token(&service, scope.as_deref(), &subject)?;
+    Ok(Json(response))
+}
+
+// ── Handler: API JWT (APIClaims) ───────────────────────────────────────────────
+
+#[openapi()]
+#[get("/api-land/docker-token?<service>&<scope>&<account>")]
+pub fn get_docker_token_api(
+    claims: APIClaims,
+    service: String,
+    scope: Option<String>,
+    account: Option<String>,
+) -> Result<Json<DockerTokenResponse>, rocket::http::Status> {
+    let subject = account.unwrap_or_else(|| claims.sub.clone());
+    let response = generate_docker_token(&service, scope.as_deref(), &subject)?;
+    Ok(Json(response))
 }

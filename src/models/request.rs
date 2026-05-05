@@ -110,3 +110,14 @@ pub struct CreateOrUpdateAppRequest {
     pub auth_redirection_path: Option<String>,
     pub web_interface: Option<bool>,
 }
+
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+pub struct DockerAccess {
+    #[serde(rename = "type")]
+    pub resource_type: String,
+    pub name: String,
+    pub actions: Vec<String>,
+}
+
+
