@@ -1822,22 +1822,52 @@ fn compute_libtrust_kid(signing_key: &SigningKey) -> String {
 }
 
 // ── Core token generation function ────────────────────────────────────────────
-
 fn generate_docker_token(
     service: &str,
     scope: Option<&str>,
     account: &str,
 ) -> Result<DockerTokenResponse, rocket::http::Status> {
-    // Load private key from environment
-    let pem = env::var("DOCKER_REGISTRY_PRIVATE_KEY")
-        .map_err(|_| rocket::http::Status::InternalServerError)?;
+    // Check 1: env var
+    let pem = match env::var("DOCKER_REGISTRY_PRIVATE_KEY") {
+        Ok(val) => {
+            println!("[docker-token] ✅ DOCKER_REGISTRY_PRIVATE_KEY loaded, len={}", val.len());
+            val
+        }
+        Err(e) => {
+            println!("[docker-token] ❌ DOCKER_REGISTRY_PRIVATE_KEY not set: {}", e);
+            return Err(rocket::http::Status::InternalServerError);
+        }
+    };
 
-    let signing_key = SigningKey::from_pkcs8_pem(&pem)
-        .map_err(|_| rocket::http::Status::InternalServerError)?;
+    // Check 2: PEM parsing
+    let signing_key = match SigningKey::from_pkcs8_pem(&pem) {
+        Ok(k) => {
+            println!("[docker-token] ✅ Private key parsed successfully");
+            k
+        }
+        Err(e) => {
+            println!("[docker-token] ❌ Failed to parse private key: {:?}", e);
+            // Try the other PEM format
+            println!("[docker-token] PEM starts with: {:?}", &pem[..50.min(pem.len())]);
+            return Err(rocket::http::Status::InternalServerError);
+        }
+    };
 
     let kid = compute_libtrust_kid(&signing_key);
+    println!("[docker-token] ✅ kid={}", kid);
 
-    // Parse scope(s) — Docker can send space-separated multiple scopes
+    // Check 3: EncodingKey
+    let encoding_key = match EncodingKey::from_ec_pem(pem.as_bytes()) {
+        Ok(k) => {
+            println!("[docker-token] ✅ EncodingKey created");
+            k
+        }
+        Err(e) => {
+            println!("[docker-token] ❌ EncodingKey::from_ec_pem failed: {:?}", e);
+            return Err(rocket::http::Status::InternalServerError);
+        }
+    };
+
     let access: Vec<DockerAccess> = scope
         .unwrap_or("")
         .split_whitespace()
@@ -1860,6 +1890,8 @@ fn generate_docker_token(
         })
         .collect();
 
+    println!("[docker-token] ✅ access scopes parsed: {:?}", access);
+
     let now = Utc::now().timestamp() as usize;
     let jti: String = rand::thread_rng()
         .sample_iter(&Alphanumeric)
@@ -1868,7 +1900,10 @@ fn generate_docker_token(
         .collect();
 
     let issuer = env::var("DOCKER_TOKEN_ISSUER")
-        .unwrap_or_else(|_| "my-auth-server".to_string());
+        .unwrap_or_else(|_| {
+            println!("[docker-token] ⚠️  DOCKER_TOKEN_ISSUER not set, using default");
+            "my-auth-server".to_string()
+        });
 
     let claims = DockerTokenClaims {
         iss: issuer,
@@ -1881,19 +1916,21 @@ fn generate_docker_token(
         access,
     };
 
-    // Build the JWT header with kid
+    // Check 4: JWT encode
     let mut header = Header::new(Algorithm::ES256);
     header.kid = Some(kid);
     header.typ = Some("JWT".to_string());
 
-    // Encode using the EC private key (PEM)
-    let token = encode(
-        &header,
-        &claims,
-        &EncodingKey::from_ec_pem(pem.as_bytes())
-            .map_err(|_| rocket::http::Status::InternalServerError)?,
-    )
-    .map_err(|_| rocket::http::Status::InternalServerError)?;
+    let token = match encode(&header, &claims, &encoding_key) {
+        Ok(t) => {
+            println!("[docker-token] ✅ JWT encoded successfully");
+            t
+        }
+        Err(e) => {
+            println!("[docker-token] ❌ JWT encode failed: {:?}", e);
+            return Err(rocket::http::Status::InternalServerError);
+        }
+    };
 
     Ok(DockerTokenResponse {
         token,
