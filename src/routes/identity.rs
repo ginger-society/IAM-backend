@@ -52,7 +52,7 @@ use sha2::{Digest, Sha256};
 use base32::Alphabet;
 use spki::EncodePublicKey;
 use serde::{Deserialize, Serialize};
-
+use sec1::DecodeEcPrivateKey;
 use crate::models::request::DockerAccess;
 
 // ── Shared structs for docker token─────────────────────────────────────────────────────────────
@@ -1840,18 +1840,19 @@ fn generate_docker_token(
     };
 
     // Check 2: PEM parsing
-    let signing_key = match SigningKey::from_pkcs8_pem(&pem) {
-        Ok(k) => {
-            println!("[docker-token] ✅ Private key parsed successfully");
-            k
-        }
-        Err(e) => {
-            println!("[docker-token] ❌ Failed to parse private key: {:?}", e);
-            // Try the other PEM format
-            println!("[docker-token] PEM starts with: {:?}", &pem[..50.min(pem.len())]);
-            return Err(rocket::http::Status::InternalServerError);
-        }
-    };
+    let signing_key = if pem.contains("BEGIN EC PRIVATE KEY") {
+        SigningKey::from_sec1_pem(&pem)
+            .map_err(|e| {
+                println!("[docker-token] ❌ from_sec1_pem failed: {:?}", e);
+                rocket::http::Status::InternalServerError
+            })
+    } else {
+        SigningKey::from_pkcs8_pem(&pem)
+            .map_err(|e| {
+                println!("[docker-token] ❌ from_pkcs8_pem failed: {:?}", e);
+                rocket::http::Status::InternalServerError
+            })
+    }?;
 
     let kid = compute_libtrust_kid(&signing_key);
     println!("[docker-token] ✅ kid={}", kid);
