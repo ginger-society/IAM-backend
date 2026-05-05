@@ -8,7 +8,7 @@ use rocket::request::{FromRequest, Outcome, Request};
 use rocket_okapi::gen::OpenApiGenerator;
 use rocket_okapi::request::OpenApiFromRequest;
 use rocket_okapi::request::RequestHeaderInput;
-use ginger_shared_rs::rocket_utils::{APIClaims, ISCClaims};
+use ginger_shared_rs::rocket_utils::{APIClaims, ISCClaims, Claims};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -61,6 +61,13 @@ impl<'r> FromRequest<'r> for BasicAuth {
 
                 let decoding_key = DecodingKey::from_secret(secret.as_ref());
                 let validation = Validation::new(Algorithm::HS256);
+
+
+                // Try as Claims (user JWT) first
+                if let Ok(token_data) = decode::<Claims>(&password, &decoding_key, &validation) {
+                    return Outcome::Success(BasicAuth::new(token_data.claims.sub));
+                }
+
 
                 // Try as APIClaims (API JWT)
                 if let Ok(token_data) = decode::<APIClaims>(&password, &decoding_key, &validation) {
