@@ -3,7 +3,7 @@ url = "https://iam-db-runtime-675766508318.asia-south1.run.app"
 lang = "Rust"
 orm = "Diesel"
 root = "src/models"
-schema_id = "4b14a9a6-9445-448b-9fc7-3cf5a1336bc6"
+schema_id = "0fdaf4b4-380b-460b-a9e1-b150d8f8f046"
 cache_schema_id = "7fe18d54-8732-4b53-90d7-8feb65ab61b0"
 branch = "main"
 
