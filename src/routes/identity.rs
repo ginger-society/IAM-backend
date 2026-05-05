@@ -1,3 +1,4 @@
+use crate::middlewares::BasicAuth::BasicAuth;
 use crate::models::response::{AccessibleApp, DockerTokenResponse, IAMLoginResponse, IsMemberResponse};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
@@ -1940,32 +1941,22 @@ fn generate_docker_token(
     })
 }
 
-// ── Handler: User JWT (Claims) ─────────────────────────────────────────────────
 
 #[openapi()]
-#[get("/docker-token?<service>&<scope>")]
-pub fn get_docker_token_user(
-    claims: Claims,
+#[get("/docker-token?<service>&<scope>&<account>")]
+pub fn get_docker_token(
+    auth: BasicAuth,
     service: String,
     scope: Option<String>,
+    account: Option<String>,
 ) -> Result<Json<DockerTokenResponse>, rocket::http::Status> {
-    // Use the authenticated user's email as the subject if account not provided
-        let subject = claims.sub.clone();
+    // Use authenticated subject, fall back to account param, then anonymous
+    let subject = if !auth.subject.is_empty() {
+        auth.subject
+    } else {
+        account.unwrap_or_default()
+    };
 
-    let response = generate_docker_token(&service, scope.as_deref(), &subject)?;
-    Ok(Json(response))
-}
-
-// ── Handler: API JWT (APIClaims) ───────────────────────────────────────────────
-
-#[openapi()]
-#[get("/api-land/docker-token?<service>&<scope>")]
-pub fn get_docker_token_api(
-    claims: APIClaims,
-    service: String,
-    scope: Option<String>,
-) -> Result<Json<DockerTokenResponse>, rocket::http::Status> {
-    let subject = claims.sub.clone();
     let response = generate_docker_token(&service, scope.as_deref(), &subject)?;
     Ok(Json(response))
 }
