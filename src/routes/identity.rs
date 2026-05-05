@@ -54,6 +54,7 @@ use spki::EncodePublicKey;
 use serde::{Deserialize, Serialize};
 use sec1::DecodeEcPrivateKey;
 use crate::models::request::DockerAccess;
+use p256::pkcs8::EncodePrivateKey;
 
 // ── Shared structs for docker token─────────────────────────────────────────────────────────────
 
@@ -1827,19 +1828,14 @@ fn generate_docker_token(
     scope: Option<&str>,
     account: &str,
 ) -> Result<DockerTokenResponse, rocket::http::Status> {
-    // Check 1: env var
     let pem = match env::var("DOCKER_REGISTRY_PRIVATE_KEY") {
-        Ok(val) => {
-            println!("[docker-token] ✅ DOCKER_REGISTRY_PRIVATE_KEY loaded, len={}", val.len());
-            val
-        }
+        Ok(val) => val,
         Err(e) => {
             println!("[docker-token] ❌ DOCKER_REGISTRY_PRIVATE_KEY not set: {}", e);
             return Err(rocket::http::Status::InternalServerError);
         }
     };
 
-    // Check 2: PEM parsing
     let signing_key = if pem.contains("BEGIN EC PRIVATE KEY") {
         SigningKey::from_sec1_pem(&pem)
             .map_err(|e| {
@@ -1857,17 +1853,22 @@ fn generate_docker_token(
     let kid = compute_libtrust_kid(&signing_key);
     println!("[docker-token] ✅ kid={}", kid);
 
-    // Check 3: EncodingKey
-    let encoding_key = match EncodingKey::from_ec_pem(pem.as_bytes()) {
-        Ok(k) => {
-            println!("[docker-token] ✅ EncodingKey created");
-            k
-        }
-        Err(e) => {
+    // Convert to PKCS#8 PEM in memory so jsonwebtoken can consume it
+    // regardless of what format the original key was in
+    let pkcs8_pem = signing_key
+        .to_pkcs8_pem(p256::pkcs8::LineEnding::LF)
+        .map_err(|e| {
+            println!("[docker-token] ❌ to_pkcs8_pem failed: {:?}", e);
+            rocket::http::Status::InternalServerError
+        })?;
+
+    let encoding_key = EncodingKey::from_ec_pem(pkcs8_pem.as_bytes())
+        .map_err(|e| {
             println!("[docker-token] ❌ EncodingKey::from_ec_pem failed: {:?}", e);
-            return Err(rocket::http::Status::InternalServerError);
-        }
-    };
+            rocket::http::Status::InternalServerError
+        })?;
+
+    println!("[docker-token] ✅ EncodingKey created");
 
     let access: Vec<DockerAccess> = scope
         .unwrap_or("")
@@ -1942,15 +1943,15 @@ fn generate_docker_token(
 // ── Handler: User JWT (Claims) ─────────────────────────────────────────────────
 
 #[openapi()]
-#[get("/docker-token?<service>&<scope>&<account>")]
+#[get("/docker-token?<service>&<scope>")]
 pub fn get_docker_token_user(
     claims: Claims,
     service: String,
     scope: Option<String>,
-    account: Option<String>,
 ) -> Result<Json<DockerTokenResponse>, rocket::http::Status> {
     // Use the authenticated user's email as the subject if account not provided
-    let subject = account.unwrap_or_else(|| claims.sub.clone());
+        let subject = claims.sub.clone();
+
     let response = generate_docker_token(&service, scope.as_deref(), &subject)?;
     Ok(Json(response))
 }
@@ -1958,14 +1959,13 @@ pub fn get_docker_token_user(
 // ── Handler: API JWT (APIClaims) ───────────────────────────────────────────────
 
 #[openapi()]
-#[get("/api-land/docker-token?<service>&<scope>&<account>")]
+#[get("/api-land/docker-token?<service>&<scope>")]
 pub fn get_docker_token_api(
     claims: APIClaims,
     service: String,
     scope: Option<String>,
-    account: Option<String>,
 ) -> Result<Json<DockerTokenResponse>, rocket::http::Status> {
-    let subject = account.unwrap_or_else(|| claims.sub.clone());
+    let subject = claims.sub.clone();
     let response = generate_docker_token(&service, scope.as_deref(), &subject)?;
     Ok(Json(response))
 }
