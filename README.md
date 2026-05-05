@@ -74,4 +74,3 @@ to restart the deployment / upgrade the pod image version
 
  kubectl rollout restart deployment iam-service-api-deployment
 ```
-

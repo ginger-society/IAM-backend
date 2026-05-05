@@ -8,7 +8,7 @@ use rocket::request::{FromRequest, Outcome, Request};
 use rocket_okapi::gen::OpenApiGenerator;
 use rocket_okapi::request::OpenApiFromRequest;
 use rocket_okapi::request::RequestHeaderInput;
-use ginger_shared_rs::rocket_utils::{APIClaims, Claims};
+use ginger_shared_rs::rocket_utils::{APIClaims, ISCClaims};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -62,13 +62,13 @@ impl<'r> FromRequest<'r> for BasicAuth {
                 let decoding_key = DecodingKey::from_secret(secret.as_ref());
                 let validation = Validation::new(Algorithm::HS256);
 
-                // Try as Claims (user JWT) first
-                if let Ok(token_data) = decode::<Claims>(&password, &decoding_key, &validation) {
+                // Try as APIClaims (API JWT)
+                if let Ok(token_data) = decode::<APIClaims>(&password, &decoding_key, &validation) {
                     return Outcome::Success(BasicAuth::new(token_data.claims.sub));
                 }
 
-                // Try as APIClaims (API JWT)
-                if let Ok(token_data) = decode::<APIClaims>(&password, &decoding_key, &validation) {
+                // Try as ISCClaims
+                if let Ok(token_data) = decode::<ISCClaims>(&password, &decoding_key, &validation) {
                     return Outcome::Success(BasicAuth::new(token_data.claims.sub));
                 }
 
@@ -91,7 +91,7 @@ impl<'a> OpenApiFromRequest<'a> for BasicAuth {
         _required: bool,
     ) -> rocket_okapi::Result<RequestHeaderInput> {
         let security_scheme = SecurityScheme {
-            description: Some("Docker registry Basic auth. Use '__token__' as username and a valid Claims or APIClaims JWT as the password.".to_owned()),
+            description: Some("Docker registry Basic auth. Use '__token__' as username and a valid ISCClaims or APIClaims JWT as the password.".to_owned()),
             data: SecuritySchemeData::Http {
                 scheme: "basic".to_owned(),
                 bearer_format: None,
