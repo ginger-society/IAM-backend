@@ -20,5 +20,7 @@ COPY --from=builder /app/target/release/IAMService /app/
 # Set the working directory
 WORKDIR /app
 
+RUN mkdir -p /etc/ssh-ca && chmod 700 /etc/ssh-ca
+
 # Run the executable when the container starts
 ENTRYPOINT ["./IAMService"]

@@ -3,6 +3,7 @@ use rocket::serde::json::Json;
 use rocket_okapi::openapi;
 
 pub mod identity;
+pub mod gitter;
 
 /// This is a description. <br />You can do simple html <br /> like <b>this<b/>
 #[openapi()]

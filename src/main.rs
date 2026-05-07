@@ -3,6 +3,7 @@ extern crate rocket;
 use rocket::Rocket;
 
 use crate::routes::identity;
+use crate::routes::gitter;
 use db::redis::create_redis_pool;
 use dotenv::dotenv;
 use rocket::Build;
@@ -61,6 +62,9 @@ fn rocket() -> Rocket<Build> {
                 identity::create_or_update_app,
                 identity::is_member,
                 identity::get_docker_token,
+                gitter::ssh_cert_user_land,
+                gitter::ssh_cert_api_land,
+                gitter::ssh_cert_isc_land,
             ],
         )
         .mount(

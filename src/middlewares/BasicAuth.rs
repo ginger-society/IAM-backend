@@ -98,7 +98,7 @@ impl<'a> OpenApiFromRequest<'a> for BasicAuth {
         _required: bool,
     ) -> rocket_okapi::Result<RequestHeaderInput> {
         let security_scheme = SecurityScheme {
-            description: Some("Docker registry Basic auth. Use '__token__' as username and a valid ISCClaims or APIClaims JWT as the password.".to_owned()),
+            description: Some("Docker registry Basic auth. Use '__token__' as username and a valid Claims, ISCClaims or APIClaims JWT as the password.".to_owned()),
             data: SecuritySchemeData::Http {
                 scheme: "basic".to_owned(),
                 bearer_format: None,
