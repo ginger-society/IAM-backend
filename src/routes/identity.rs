@@ -1291,7 +1291,7 @@ pub fn create_api_session_token(
 
     let expiration = Utc::now() + Duration::minutes(20);
     let claims = APIClaims {
-        sub: api_token.id.to_string(),
+        sub: group.identifier.clone(), // this is the group uuid
         exp: expiration.timestamp() as usize,
         group_id: api_token.parent_id,
         scopes: vec!["read".to_string(), "write".to_string()],
