@@ -1252,7 +1252,6 @@ pub fn manage_membership(
 
     Ok(Json(json!({ "status": "success" })))
 }
-
 #[openapi()]
 #[post("/create-api-session-token", data = "<request>")]
 pub fn create_api_session_token(
@@ -1260,33 +1259,41 @@ pub fn create_api_session_token(
     request: Json<CreateSessionTokenRequest>,
 ) -> status::Custom<Json<CreateSessionTokenResponse>> {
     use crate::models::schema::schema::api_token::dsl as api_token_dsl;
+    use crate::models::schema::schema::group::dsl as group_dsl;
 
     let mut conn = rdb.get().expect("Failed to get DB connection");
 
-    // Check if the provided API token is valid
-    let api_token_result: QueryResult<Api_Token> = api_token_dsl::api_token
+    // Fetch the api_token and join with group to get the identifier
+    let result: Option<(Api_Token, Group)> = api_token_dsl::api_token
+        .inner_join(group_dsl::group.on(group_dsl::id.eq(api_token_dsl::parent_id)))
         .filter(api_token_dsl::token_str.eq(&request.api_token))
         .filter(api_token_dsl::is_active.eq(true))
-        .first::<Api_Token>(&mut conn);
+        .select((
+            Api_Token::as_select(),
+            Group::as_select(),
+        ))
+        .first::<(Api_Token, Group)>(&mut conn)
+        .optional()
+        .unwrap_or(None);
 
-    let api_token = match api_token_result {
-        Ok(token) => token,
-        Err(_) => {
+    let (api_token, group) = match result {
+        Some(pair) => pair,
+        None => {
             return status::Custom(
                 Status::Unauthorized,
                 Json(CreateSessionTokenResponse {
                     session_token: "".to_string(),
+                    group_identifier: "".to_string(),
                 }),
             );
         }
     };
 
-    // Generate a JWT session token valid for 5 minutes
     let expiration = Utc::now() + Duration::minutes(20);
     let claims = APIClaims {
         sub: api_token.id.to_string(),
         exp: expiration.timestamp() as usize,
-        group_id: api_token.parent_id, // Use parent_id from the Api_Token
+        group_id: api_token.parent_id,
         scopes: vec!["read".to_string(), "write".to_string()],
     };
 
@@ -1302,6 +1309,7 @@ pub fn create_api_session_token(
         Status::Ok,
         Json(CreateSessionTokenResponse {
             session_token: token,
+            group_identifier: group.identifier,  // populated from the join
         }),
     )
 }
@@ -1337,7 +1345,7 @@ pub fn create_api_session_token_interactive(
     // Generate a JWT session token valid for 5 minutes
     let expiration = Utc::now() + Duration::minutes(500);
     let claims = APIClaims {
-        sub: group.identifier,
+        sub: group.identifier.clone(),
         exp: expiration.timestamp() as usize,
         group_id: group.id, // Use parent_id from the Api_Token
         scopes,
@@ -1353,6 +1361,7 @@ pub fn create_api_session_token_interactive(
 
     Ok(Json(CreateSessionTokenResponse {
         session_token: token,
+        group_identifier: group.identifier,
     }))
 }
 

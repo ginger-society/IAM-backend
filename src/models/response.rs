@@ -61,6 +61,7 @@ pub struct UserInfoResponse {
 #[derive(Serialize, Deserialize, JsonSchema)]
 pub struct CreateSessionTokenResponse {
     pub session_token: String,
+    pub group_identifier: String,
 }
 
 /// Struct to represent the API token response
