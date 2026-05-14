@@ -1289,7 +1289,10 @@ pub fn create_api_session_token(
         }
     };
 
-    let expiration = Utc::now() + Duration::minutes(20);
+    let expiration = match request.days_to_expire {
+        Some(days) => Utc::now() + Duration::days(days as i64),
+        None => Utc::now() + Duration::minutes(20),
+    };
     let claims = APIClaims {
         sub: group.identifier.clone(), // this is the group uuid
         exp: expiration.timestamp() as usize,

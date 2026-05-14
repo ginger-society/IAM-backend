@@ -78,6 +78,7 @@ pub struct LogoutRequest {
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct CreateSessionTokenRequest {
     pub api_token: String,
+    pub days_to_expire: Option<i64>,
 }
 
 #[derive(Deserialize, JsonSchema)]
