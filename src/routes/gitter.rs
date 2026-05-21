@@ -125,6 +125,26 @@ fn issue_cert(principal: &str, ttl_seconds: u64) -> Result<SshCertResponse, Stat
         .map_err(|e| {
             eprintln!("[ssh-cert] ❌ valid_principal failed: {}", e);
             Status::InternalServerError
+        })?
+        .extension("permit-pty", "")
+        .map_err(|e| {
+            eprintln!("[ssh-cert] ❌ permit-pty extension failed: {}", e);
+            Status::InternalServerError
+        })?
+        .extension("permit-port-forwarding", "")
+        .map_err(|e| {
+            eprintln!("[ssh-cert] ❌ permit-port-forwarding extension failed: {}", e);
+            Status::InternalServerError
+        })?
+        .extension("permit-agent-forwarding", "")
+        .map_err(|e| {
+            eprintln!("[ssh-cert] ❌ permit-agent-forwarding extension failed: {}", e);
+            Status::InternalServerError
+        })?
+        .extension("permit-user-rc", "")
+        .map_err(|e| {
+            eprintln!("[ssh-cert] ❌ permit-user-rc extension failed: {}", e);
+            Status::InternalServerError
         })?;
 
     let cert = builder
@@ -166,7 +186,7 @@ fn issue_cert(principal: &str, ttl_seconds: u64) -> Result<SshCertResponse, Stat
 pub fn ssh_cert_user_land(
     claims: Claims,
 ) -> Result<Json<SshCertResponse>, Status> {
-    let principal = claims.sub;
+    let principal: String = claims.sub;
     let ttl = 500 * 60; // 500 minutes
     let resp = issue_cert(&principal, ttl)?;
     println!("[ssh-cert] ✅ user-land cert issued for '{}' (500 min)", principal);
