@@ -330,6 +330,7 @@ fn user_has_access_to_app(
     }
 }
 
+
 #[openapi()]
 #[post("/login", data = "<login_request>")]
 pub fn login(
@@ -340,61 +341,106 @@ pub fn login(
     use crate::models::schema::schema::user::dsl::*;
     use bcrypt::verify;
 
+    println!("[login] attempt for email: {}", login_request.email);
+
     let mut conn = rdb
         .get()
-        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+        .map_err(|e| {
+            eprintln!("[login] ✗ failed to get DB connection: {}", e);
+            rocket::http::Status::ServiceUnavailable
+        })?;
 
     let mut cache_connection = cache_pool
         .get()
-        .map_err(|_| rocket::http::Status::ServiceUnavailable)?;
+        .map_err(|e| {
+            eprintln!("[login] ✗ failed to get Redis connection: {}", e);
+            rocket::http::Status::ServiceUnavailable
+        })?;
 
     // Fetch the user by email
     let u: User = user
         .filter(email_id.eq(&login_request.email))
         .first(&mut conn)
-        .map_err(|_| rocket::http::Status::Unauthorized)?;
+        .map_err(|e| {
+            eprintln!("[login] ✗ user not found for email '{}': {}", login_request.email, e);
+            rocket::http::Status::Unauthorized
+        })?;
+
+    println!("[login] ✓ user found: id={} email={}", u.id, u.email_id);
+
+    // Check password hash is present
+    if u.password_hash.is_none() {
+        eprintln!("[login] ✗ user {} has no password hash set", u.email_id);
+        return Err(rocket::http::Status::Unauthorized);
+    }
 
     // Verify the password
     let valid = verify(&login_request.password, u.password_hash.as_ref().unwrap())
-        .map_err(|_| rocket::http::Status::Unauthorized)?;
+        .map_err(|e| {
+            eprintln!("[login] ✗ bcrypt verify error for user {}: {}", u.email_id, e);
+            rocket::http::Status::Unauthorized
+        })?;
 
-    if valid {
-        // Fetch user_groups from cache or database
-        let cache_key = format!("user_groups:{}", u.id);
-        let user_groups: Vec<String> = match cache_connection.get::<_, Option<String>>(&cache_key) {
-            Ok(Some(cached_groups)) => {
-                serde_json::from_str(&cached_groups).unwrap_or_else(|_| vec![])
-            }
-            Ok(None) | Err(_) => {
-                // Fallback to database if cache miss
-                use crate::models::schema::schema::group::dsl as group_dsl;
-                use crate::models::schema::schema::group_users::dsl as gu_dsl;
+    if !valid {
+        eprintln!("[login] ✗ invalid password for user {}", u.email_id);
+        return Err(rocket::http::Status::Unauthorized);
+    }
 
-                let groups_from_db: Vec<String> = gu_dsl::group_users
-                    .inner_join(group_dsl::group.on(group_dsl::id.eq(gu_dsl::group_id)))
-                    .filter(gu_dsl::user_id.eq(u.id))
-                    .select(group_dsl::identifier)
-                    .load(&mut conn)
-                    .unwrap_or_else(|_| vec![]);
+    println!("[login] ✓ password verified for user {}", u.email_id);
 
-                // Cache the result
-                let groups_json = serde_json::to_string(&groups_from_db).unwrap_or_default();
-                let _: () = cache_connection
-                    .set_ex(&cache_key, groups_json, 3600) // Cache for 1 hour
-                    .unwrap_or(());
+    // Fetch user_groups from cache or database
+    let cache_key = format!("user_groups:{}", u.id);
+    let user_groups: Vec<String> = match cache_connection.get::<_, Option<String>>(&cache_key) {
+        Ok(Some(cached_groups)) => {
+            println!("[login] ✓ user_groups cache hit for user {}", u.id);
+            serde_json::from_str(&cached_groups).unwrap_or_else(|e| {
+                eprintln!("[login] ✗ failed to deserialize cached groups: {}", e);
+                vec![]
+            })
+        }
+        Ok(None) => {
+            println!("[login] user_groups cache miss for user {} — querying DB", u.id);
+            use crate::models::schema::schema::group::dsl as group_dsl;
+            use crate::models::schema::schema::group_users::dsl as gu_dsl;
 
-                groups_from_db
-            }
-        };
+            let groups_from_db: Vec<String> = gu_dsl::group_users
+                .inner_join(group_dsl::group.on(group_dsl::id.eq(gu_dsl::group_id)))
+                .filter(gu_dsl::user_id.eq(u.id))
+                .select(group_dsl::identifier)
+                .load(&mut conn)
+                .unwrap_or_else(|e| {
+                    eprintln!("[login] ✗ failed to load groups from DB for user {}: {}", u.id, e);
+                    vec![]
+                });
 
-        // Determine app_id for Redis cache
-        let app_id = login_request.client_id.clone();
+            println!("[login] ✓ user {} groups from DB: {:?}", u.id, groups_from_db);
 
-        // Create tokens with app_id if provided
-        let app_tokens = if let Some(app_id) = &app_id {
-            if user_has_access_to_app(&mut conn, app_id, &user_groups)
-                .map_err(|_| rocket::http::Status::InternalServerError)?
-            {
+            let groups_json = serde_json::to_string(&groups_from_db).unwrap_or_default();
+            let _: () = cache_connection
+                .set_ex(&cache_key, groups_json, 3600)
+                .unwrap_or(());
+
+            groups_from_db
+        }
+        Err(e) => {
+            eprintln!("[login] ✗ Redis error fetching user_groups for user {}: {}", u.id, e);
+            vec![]
+        }
+    };
+
+    println!("[login] user {} is in groups: {:?}", u.id, user_groups);
+
+    // Determine app_id for Redis cache
+    let app_id = login_request.client_id.clone();
+    println!("[login] client_id: {:?}", app_id);
+
+    let app_tokens = if let Some(app_id) = &app_id {
+        println!("[login] checking access for app_id: {}", app_id);
+
+        match user_has_access_to_app(&mut conn, app_id, &user_groups) {
+            Ok(true) => {
+                println!("[login] ✓ user {} has access to app {}", u.email_id, app_id);
+
                 let access_token = create_jwt(
                     &u.email_id,
                     &u.id.to_string(),
@@ -422,63 +468,81 @@ pub fn login(
                     .set_ex(
                         refresh_token.clone(),
                         session_data_with_app.to_string(),
-                        3600, // Token expires in 1 hour
+                        3600,
                     )
-                    .map_err(|_| rocket::http::Status::InternalServerError)?;
+                    .map_err(|e| {
+                        eprintln!("[login] ✗ failed to cache session for app {}: {}", app_id, e);
+                        rocket::http::Status::InternalServerError
+                    })?;
 
                 Some(LoginResponse {
                     access_token,
                     refresh_token,
                 })
-            } else {
-                println!("User does not have access to the app");
+            }
+            Ok(false) => {
+                eprintln!(
+                    "[login] ✗ user {} does not have access to app {} — groups: {:?}",
+                    u.email_id, app_id, user_groups
+                );
                 return Err(rocket::http::Status::Forbidden);
             }
-        } else {
-            None
-        };
-
-        // Create tokens without app_id
-        let access_token_without_app = create_jwt(
-            &u.email_id,
-            &u.id.to_string(),
-            "access",
-            &u.first_name,
-            &u.last_name,
-            &u.middle_name,
-            &None,
-        );
-        let refresh_token_without_app = create_jwt(
-            &u.email_id,
-            &u.id.to_string(),
-            "refresh",
-            &u.first_name,
-            &u.last_name,
-            &u.middle_name,
-            &None,
-        );
-
-        let session_data_without_app = json!({
-            "user_id": u.id,
-        });
-        let _: () = cache_connection
-            .set_ex(
-                refresh_token_without_app.clone(),
-                session_data_without_app.to_string(),
-                3600, // Token expires in 1 hour
-            )
-            .map_err(|_| rocket::http::Status::InternalServerError)?;
-
-        Ok(Json(IAMLoginResponse {
-            app_tokens,
-            iam_tokens: LoginResponse {
-                access_token: access_token_without_app,
-                refresh_token: refresh_token_without_app,
-            },
-        }))
+            Err(e) => {
+                eprintln!(
+                    "[login] ✗ error checking app access for user {} / app {}: {}",
+                    u.email_id, app_id, e
+                );
+                return Err(rocket::http::Status::InternalServerError);
+            }
+        }
     } else {
-        Err(rocket::http::Status::Unauthorized)
-    }
+        println!("[login] no client_id provided — skipping app token generation");
+        None
+    };
+
+    // Create tokens without app_id
+    let access_token_without_app = create_jwt(
+        &u.email_id,
+        &u.id.to_string(),
+        "access",
+        &u.first_name,
+        &u.last_name,
+        &u.middle_name,
+        &None,
+    );
+    let refresh_token_without_app = create_jwt(
+        &u.email_id,
+        &u.id.to_string(),
+        "refresh",
+        &u.first_name,
+        &u.last_name,
+        &u.middle_name,
+        &None,
+    );
+
+    let session_data_without_app = json!({
+        "user_id": u.id,
+    });
+    let _: () = cache_connection
+        .set_ex(
+            refresh_token_without_app.clone(),
+            session_data_without_app.to_string(),
+            3600,
+        )
+        .map_err(|e| {
+            eprintln!("[login] ✗ failed to cache iam session: {}", e);
+            rocket::http::Status::InternalServerError
+        })?;
+
+    println!("[login] ✓ login successful for user {}", u.email_id);
+
+    Ok(Json(IAMLoginResponse {
+        app_tokens,
+        iam_tokens: LoginResponse {
+            access_token: access_token_without_app,
+            refresh_token: refresh_token_without_app,
+        },
+    }))
 }
 
 #[openapi()]
