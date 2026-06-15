@@ -633,7 +633,7 @@ fn create_jwt(
 ) -> String {
     let expiration = match token_type {
         "access" => Utc::now() + Duration::minutes(15), // Short-lived access token
-        "refresh" => Utc::now() + Duration::days(30),   // Longer-lived refresh token
+        "refresh" => Utc::now() + Duration::hours(10),   // Longer-lived refresh token
         _ => panic!("Invalid token type"),
     };
     let claims = Claims {
@@ -1410,7 +1410,7 @@ pub fn create_api_session_token_interactive(
     };
 
     // Generate a JWT session token valid for 5 minutes
-    let expiration = Utc::now() + Duration::minutes(500);
+    let expiration = Utc::now() + Duration::hours(10);
     let claims = APIClaims {
         sub: group.identifier.clone(),
         exp: expiration.timestamp() as usize,
