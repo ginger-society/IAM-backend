@@ -189,7 +189,7 @@ pub fn ssh_cert_user_land(
     let principal: String = claims.sub;
     let ttl = 20 * 60; // 20 minutes
     let resp = issue_cert(&principal, ttl)?;
-    println!("[ssh-cert] ✅ user-land cert issued for '{}' (500 min)", principal);
+    println!("[ssh-cert] ✅ user-land cert issued for '{}' (20 min)", principal);
     Ok(Json(resp))
 }
 
@@ -202,7 +202,7 @@ pub fn ssh_cert_api_land(
     let principal = claims.sub;
     let ttl = 10 * 60 * 60; // 10 hours minutes
     let resp = issue_cert(&principal, ttl)?;
-    println!("[ssh-cert] ✅ api-land cert issued for '{}' (20 min)", principal);
+    println!("[ssh-cert] ✅ api-land cert issued for '{}' (10 hours)", principal);
     Ok(Json(resp))
 }
 
